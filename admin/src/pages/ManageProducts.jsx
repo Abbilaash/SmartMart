@@ -1,83 +1,139 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HiPlus, HiPencil, HiTrash, HiSearch } from 'react-icons/hi';
 import Modal from '../components/Modal';
 
-const ManageProducts = () => {
-  const [products, setProducts] = useState([
-    { id: 1, name: 'iPhone 15 Pro', price: 999, stock: 45, category: 'Electronics', image: 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg?auto=compress&cs=tinysrgb&w=400' },
-    { id: 2, name: 'MacBook Air M2', price: 1199, stock: 23, category: 'Electronics', image: 'https://images.pexels.com/photos/205421/pexels-photo-205421.jpeg?auto=compress&cs=tinysrgb&w=400' },
-    { id: 3, name: 'Nike Air Max', price: 120, stock: 78, category: 'Fashion', image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=400' },
-    { id: 4, name: 'Coffee Maker', price: 89, stock: 12, category: 'Home', image: 'https://images.pexels.com/photos/324028/pexels-photo-324028.jpeg?auto=compress&cs=tinysrgb&w=400' },
-    { id: 5, name: 'Wireless Headphones', price: 199, stock: 56, category: 'Electronics', image: 'https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=400' },
-    { id: 6, name: 'Smart Watch', price: 299, stock: 34, category: 'Electronics', image: 'https://images.pexels.com/photos/437037/pexels-photo-437037.jpeg?auto=compress&cs=tinysrgb&w=400' }
-  ]);
+const API_URL = 'http://localhost:5000/admin/product';
 
+const ManageProducts = () => {
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
+    product_id: '',
     name: '',
+    barcode: '',
+    description: '',
     price: '',
-    category: '',
-    discount: '',
-    quantity: '',
-    description: ''
+    discount_id: '',
+    stck_qty: '',
+    is_active: true,
+    created_at: ''
   });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch(`${API_URL}/get_products`);
+      const data = await res.json();
+      setProducts(data.products || []);
+    } catch (err) {
+      setProducts([]);
+    }
+  };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase())
+    product.barcode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleAddProduct = () => {
     setEditingProduct(null);
-    setFormData({ name: '', price: '', category: '', discount: '', quantity: '', description: '' });
+    setFormData({
+      product_id: '',
+      name: '',
+      barcode: '',
+      description: '',
+      price: '',
+      discount_id: '',
+      stck_qty: '',
+      is_active: true,
+      created_at: new Date().toISOString()
+    });
+    setError('');
     setIsModalOpen(true);
   };
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
     setFormData({
+      product_id: product.product_id,
       name: product.name,
+      barcode: product.barcode,
+      description: product.description,
       price: product.price,
-      category: product.category,
-      discount: '',
-      quantity: product.stock,
-      description: ''
+      discount_id: product.discount_id,
+      stck_qty: product.stck_qty,
+      is_active: product.is_active,
+      created_at: product.created_at
     });
+    setError('');
     setIsModalOpen(true);
   };
 
   const handleDeleteProduct = (id) => {
-    setProducts(products.filter(product => product.id !== id));
+    // Implement delete logic if needed
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingProduct) {
-      setProducts(products.map(product =>
-        product.id === editingProduct.id
-          ? { ...product, name: formData.name, price: parseInt(formData.price), stock: parseInt(formData.quantity), category: formData.category }
-          : product
-      ));
-    } else {
-      const newProduct = {
-        id: Date.now(),
-        name: formData.name,
-        price: parseInt(formData.price),
-        stock: parseInt(formData.quantity),
-        category: formData.category,
-        image: 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg?auto=compress&cs=tinysrgb&w=400'
-      };
-      setProducts([...products, newProduct]);
+    setError('');
+    // Validate required fields
+    if (!formData.product_id || !formData.name || !formData.barcode || !formData.price || !formData.stck_qty) {
+      setError('Please fill all required fields.');
+      return;
     }
-    setIsModalOpen(false);
-  };
-
-  const getStockStatus = (stock) => {
-    if (stock > 50) return { text: 'In Stock', color: 'bg-emerald-500' };
-    if (stock > 20) return { text: 'Low Stock', color: 'bg-amber-500' };
-    return { text: 'Out of Stock', color: 'bg-red-500' };
+    try {
+      if (editingProduct) {
+        // Update product
+        const res = await fetch(`${API_URL}/update_product`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            price: parseFloat(formData.price),
+            stck_qty: parseInt(formData.stck_qty),
+            is_active: Boolean(formData.is_active),
+            created_at: formData.created_at || new Date().toISOString(),
+            image_url: '' // Not used
+          })
+        });
+        if (res.ok) {
+          fetchProducts();
+          setIsModalOpen(false);
+        } else {
+          const data = await res.json();
+          setError(data.message || 'Failed to update product');
+        }
+      } else {
+        // Add product
+        const res = await fetch(`${API_URL}/add_product`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            price: parseFloat(formData.price),
+            stck_qty: parseInt(formData.stck_qty),
+            is_active: Boolean(formData.is_active),
+            created_at: formData.created_at || new Date().toISOString(),
+            image_url: '' // Not used
+          })
+        });
+        if (res.ok) {
+          fetchProducts();
+          setIsModalOpen(false);
+        } else {
+          const data = await res.json();
+          setError(data.message || 'Failed to add product');
+        }
+      }
+    } catch (err) {
+      setError('Network error');
+    }
   };
 
   return (
@@ -108,130 +164,140 @@ const ManageProducts = () => {
         />
       </div>
 
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => {
-          const stockStatus = getStockStatus(product.stock);
-          return (
-            <div key={product.id} className="bg-slate-800 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full h-48 object-cover rounded-xl mb-4"
-              />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white">{product.name}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs text-white ${stockStatus.color}`}>
-                    {stockStatus.text}
+      {/* Products List View */}
+      <div className="overflow-x-auto rounded-xl bg-slate-800">
+        <table className="min-w-full divide-y divide-slate-700">
+          <thead>
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Product ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Barcode</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stock Qty</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Active</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700">
+            {filteredProducts.map((product) => (
+              <tr key={product._id}>
+                <td className="px-6 py-4 whitespace-nowrap text-white">{product.product_id}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-white">{product.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-white">{product.barcode}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-white">₹{product.price}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-white">{product.stck_qty}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded-full text-xs ${product.is_active ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                    {product.is_active ? 'Active' : 'Inactive'}
                   </span>
-                </div>
-                <p className="text-gray-400 text-sm">{product.category}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold text-emerald-400">${product.price}</span>
-                  <span className="text-gray-400">Stock: {product.stock}</span>
-                </div>
-                <div className="flex space-x-2 mt-4">
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap flex space-x-2">
                   <button
                     onClick={() => handleEditProduct(product)}
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                    className="bg-blue-600 text-white py-1 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1"
                   >
                     <HiPencil className="w-4 h-4" />
                     <span>Edit</span>
                   </button>
                   <button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                    onClick={() => handleDeleteProduct(product._id)}
+                    className="bg-red-600 text-white py-1 px-3 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-1"
                   >
                     <HiTrash className="w-4 h-4" />
                     <span>Delete</span>
                   </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Add/Edit Product Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Edit Product' : 'Add New Product'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">Product Name</label>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Product ID</label>
             <input
               type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              value={formData.product_id}
+              onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
               className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">Price ($)</label>
-              <input
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({...formData, price: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">Quantity</label>
-              <input
-                type="number"
-                value={formData.quantity}
-                onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+              required
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">Category</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Fashion">Fashion</option>
-                <option value="Home">Home</option>
-                <option value="Sports">Sports</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">Discount (%)</label>
-              <input
-                type="number"
-                value={formData.discount}
-                onChange={(e) => setFormData({...formData, discount: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-                min="0"
-                max="100"
-              />
-            </div>
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Barcode</label>
+            <input
+              type="text"
+              value={formData.barcode}
+              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+              required
+            />
           </div>
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              rows="3"
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows="2"
               className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
             ></textarea>
           </div>
-          <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">Product Image</label>
-            <div className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center">
-              <p className="text-gray-400">Click to upload or drag and drop</p>
-              <p className="text-sm text-gray-500 mt-1">PNG, JPG up to 10MB</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-300 text-sm font-medium mb-2">Price (₹)</label>
+              <input
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm font-medium mb-2">Stock Qty</label>
+              <input
+                type="number"
+                value={formData.stck_qty}
+                onChange={(e) => setFormData({ ...formData, stck_qty: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+                required
+              />
             </div>
           </div>
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Discount ID</label>
+            <input
+              type="text"
+              value={formData.discount_id}
+              onChange={(e) => setFormData({ ...formData, discount_id: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Active</label>
+            <select
+              value={formData.is_active}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' })}
+              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+            >
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+          {error && <div className="text-red-400 text-sm text-center">{error}</div>}
           <div className="flex space-x-4 pt-4">
             <button
               type="button"
