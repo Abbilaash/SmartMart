@@ -1,36 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { HiFilter, HiCreditCard, HiCash } from 'react-icons/hi';
 
 const Payments = () => {
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterDate, setFilterDate] = useState('All');
+  const [transactions, setTransactions] = useState([]);
+  const [monthlyRevenue, setMonthlyRevenue] = useState([]);
+  const [weeklyRevenue, setWeeklyRevenue] = useState([]);
+  const [summary, setSummary] = useState({
+    total_revenue: 0,
+    total_transactions: 0,
+    success_rate: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const transactions = [
-    { id: 'TXN001', orderId: '#12345', amount: 299.99, mode: 'Card', status: 'Completed', date: '2024-01-15', customer: 'John Smith' },
-    { id: 'TXN002', orderId: '#12346', amount: 1199.99, mode: 'UPI', status: 'Completed', date: '2024-01-14', customer: 'Sarah Johnson' },
-    { id: 'TXN003', orderId: '#12347', amount: 89.99, mode: 'Cash', status: 'Failed', date: '2024-01-14', customer: 'Mike Wilson' },
-    { id: 'TXN004', orderId: '#12348', amount: 199.99, mode: 'Card', status: 'Pending', date: '2024-01-13', customer: 'Emma Davis' },
-    { id: 'TXN005', orderId: '#12349', amount: 120.00, mode: 'UPI', status: 'Completed', date: '2024-01-13', customer: 'James Brown' },
-    { id: 'TXN006', orderId: '#12350', amount: 459.99, mode: 'Card', status: 'Completed', date: '2024-01-12', customer: 'Lisa Garcia' },
-    { id: 'TXN007', orderId: '#12351', amount: 75.50, mode: 'Cash', status: 'Completed', date: '2024-01-12', customer: 'David Lee' }
-  ];
+  useEffect(() => {
+    fetchPaymentsData();
+  }, [filterStatus, filterDate]);
 
-  const monthlyRevenue = [
-    { month: 'Jan', revenue: 45000 },
-    { month: 'Feb', revenue: 52000 },
-    { month: 'Mar', revenue: 48000 },
-    { month: 'Apr', revenue: 61000 },
-    { month: 'May', revenue: 55000 },
-    { month: 'Jun', revenue: 67000 }
-  ];
+  const fetchPaymentsData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const weeklyRevenue = [
-    { week: 'Week 1', revenue: 12000 },
-    { week: 'Week 2', revenue: 15000 },
-    { week: 'Week 3', revenue: 18000 },
-    { week: 'Week 4', revenue: 22000 }
-  ];
+      // Fetch all data in parallel
+      const [transactionsRes, monthlyRes, weeklyRes, summaryRes] = await Promise.all([
+        fetch(`http://localhost:5000/admin/payments/transactions?status=${filterStatus}&date=${filterDate}`),
+        fetch(`http://localhost:5000/admin/payments/monthly_revenue?status=${filterStatus}&date=${filterDate}`),
+        fetch(`http://localhost:5000/admin/payments/weekly_revenue?status=${filterStatus}&date=${filterDate}`),
+        fetch(`http://localhost:5000/admin/payments/summary?status=${filterStatus}&date=${filterDate}`)
+      ]);
+
+      if (!transactionsRes.ok || !monthlyRes.ok || !weeklyRes.ok || !summaryRes.ok) {
+        throw new Error('Failed to fetch payments data');
+      }
+
+      const [transactionsData, monthlyData, weeklyData, summaryData] = await Promise.all([
+        transactionsRes.json(),
+        monthlyRes.json(),
+        weeklyRes.json(),
+        summaryRes.json()
+      ]);
+
+      console.log('📊 API Response Data:', {
+        transactions: transactionsData,
+        monthly: monthlyData,
+        weekly: weeklyData,
+        summary: summaryData
+      });
+
+      setTransactions(transactionsData.transactions || []);
+      setMonthlyRevenue(monthlyData.monthly_revenue || []);
+      setWeeklyRevenue(weeklyData.weekly_revenue || []);
+      setSummary(summaryData);
+
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching payments data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -49,15 +81,18 @@ const Payments = () => {
     }
   };
 
-  const filteredTransactions = transactions.filter(transaction => {
-    const statusMatch = filterStatus === 'All' || transaction.status === filterStatus;
-    const dateMatch = filterDate === 'All' || transaction.date.includes(filterDate);
-    return statusMatch && dateMatch;
-  });
+  // Transactions are already filtered by the backend based on filterStatus and filterDate
+  const filteredTransactions = transactions;
 
-  const totalRevenue = filteredTransactions.reduce((sum, transaction) => 
-    transaction.status === 'Completed' ? sum + transaction.amount : sum, 0
-  );
+  // Debug logging
+  console.log('🔍 Current State:', {
+    transactions: transactions.length,
+    monthlyRevenue: monthlyRevenue.length,
+    weeklyRevenue: weeklyRevenue.length,
+    summary,
+    loading,
+    error
+  });
 
   return (
     <div className="space-y-6">
@@ -104,7 +139,7 @@ const Payments = () => {
           </div>
           <div>
             <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
-            <p className="text-white text-2xl font-bold">${totalRevenue.toFixed(2)}</p>
+            <p className="text-white text-2xl font-bold">₹{summary.total_revenue.toFixed(2)}</p>
           </div>
         </div>
         
@@ -116,7 +151,7 @@ const Payments = () => {
           </div>
           <div>
             <p className="text-gray-400 text-sm mb-1">Total Transactions</p>
-            <p className="text-white text-2xl font-bold">{filteredTransactions.length}</p>
+            <p className="text-white text-2xl font-bold">{summary.total_transactions}</p>
           </div>
         </div>
         
@@ -128,9 +163,7 @@ const Payments = () => {
           </div>
           <div>
             <p className="text-gray-400 text-sm mb-1">Success Rate</p>
-            <p className="text-white text-2xl font-bold">
-              {((filteredTransactions.filter(t => t.status === 'Completed').length / filteredTransactions.length) * 100).toFixed(1)}%
-            </p>
+            <p className="text-white text-2xl font-bold">{summary.success_rate}%</p>
           </div>
         </div>
       </div>
@@ -140,44 +173,72 @@ const Payments = () => {
         <div className="bg-slate-800 rounded-2xl p-6 shadow-md">
           <h3 className="text-xl font-bold text-white mb-6">Monthly Revenue</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyRevenue}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="month" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1F2937', 
-                    border: 'none', 
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }} 
-                />
-                <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-gray-400">Loading monthly revenue...</div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-red-400">Error: {error}</div>
+              </div>
+            ) : monthlyRevenue.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyRevenue}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="month" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937', 
+                      border: 'none', 
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }} 
+                  />
+                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-gray-400">No monthly revenue data available</div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="bg-slate-800 rounded-2xl p-6 shadow-md">
           <h3 className="text-xl font-bold text-white mb-6">Weekly Revenue Trend</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weeklyRevenue}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="week" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1F2937', 
-                    border: 'none', 
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }} 
-                />
-                <Line type="monotone" dataKey="revenue" stroke="#7c3aed" strokeWidth={3} dot={{ fill: '#7c3aed' }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-gray-400">Loading weekly revenue...</div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-red-400">Error: {error}</div>
+              </div>
+            ) : weeklyRevenue.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={weeklyRevenue}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="week" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937', 
+                      border: 'none', 
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }} 
+                  />
+                  <Line type="monotone" dataKey="revenue" stroke="#7c3aed" strokeWidth={3} dot={{ fill: '#7c3aed' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-gray-400">No weekly revenue data available</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -201,26 +262,46 @@ const Payments = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} className="border-b border-slate-600 hover:bg-slate-700 transition-colors">
-                  <td className="py-4 px-6 text-white font-medium">{transaction.id}</td>
-                  <td className="py-4 px-6 text-violet-400">{transaction.orderId}</td>
-                  <td className="py-4 px-6 text-white">{transaction.customer}</td>
-                  <td className="py-4 px-6 text-emerald-400 font-bold">${transaction.amount}</td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center space-x-2 text-white">
-                      {getModeIcon(transaction.mode)}
-                      <span>{transaction.mode}</span>
-                    </div>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-gray-400">
+                    Loading transactions...
                   </td>
-                  <td className="py-4 px-6">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
-                      {transaction.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-gray-300">{transaction.date}</td>
                 </tr>
-              ))}
+              ) : error ? (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-red-400">
+                    Error: {error}
+                  </td>
+                </tr>
+              ) : filteredTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-gray-400">
+                    No transactions found
+                  </td>
+                </tr>
+              ) : (
+                filteredTransactions.map((transaction) => (
+                  <tr key={transaction._id} className="border-b border-slate-600 hover:bg-slate-700 transition-colors">
+                    <td className="py-4 px-6 text-white font-medium">{transaction.transaction_id}</td>
+                    <td className="py-4 px-6 text-violet-400">{transaction.order_id}</td>
+                    <td className="py-4 px-6 text-white">{transaction.customer_name}</td>
+                    <td className="py-4 px-6 text-emerald-400 font-bold">₹{transaction.amount}</td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2 text-white">
+                        {getModeIcon(transaction.payment_mode)}
+                        <span>{transaction.payment_mode}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(transaction.payment_status)}`}>
+                        {transaction.payment_status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-gray-300">{transaction.transaction_date}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
