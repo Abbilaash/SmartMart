@@ -47,5 +47,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app uses the camera to scan barcodes and QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select images.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app may use the microphone for enhanced barcode scanning.</string>
 </dict>
 </plist>
