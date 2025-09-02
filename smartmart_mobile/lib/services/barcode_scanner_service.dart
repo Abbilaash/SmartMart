@@ -5,26 +5,29 @@ import 'mock_data_service.dart';
 class BarcodeScannerService {
   static Product? scanProductFromBarcode(String barcodeData) {
     try {
-      // Parse barcode data - assuming barcode contains product ID
-      // In real implementation, this would call your backend API
-      final productId = barcodeData.trim();
-
-      // For now, we'll use mock data to simulate product lookup
+      // Parse barcode data - in real implementation, this would call your backend API
+      final barcode = barcodeData.trim();
+      
+      // For demo purposes, we'll accept any barcode and map it to a product
+      // In a real app, this would query a database with the actual barcode
       final products = MockDataService.getProducts();
-      final product = products.firstWhere(
-        (product) => product.id == productId,
-        orElse: () => throw Exception('Product not found'),
-      );
-
-      return product;
+      
+      // Create a simple hash-based mapping to consistently map barcodes to products
+      final hash = barcode.hashCode.abs();
+      final productIndex = hash % products.length;
+      
+      return products[productIndex];
     } catch (e) {
       throw Exception('Invalid barcode or product not found');
     }
   }
 
   static String generateProductBarcode(String productId) {
-    // In real implementation, this would generate a barcode for a product
-    return productId;
+    // Generate a realistic-looking barcode for demo purposes
+    // In real implementation, this would generate a proper barcode
+    final baseBarcode = '1234567890123'; // 13-digit EAN-13 format
+    final productNum = int.tryParse(productId) ?? 1;
+    return '${baseBarcode.substring(0, 12)}$productNum';
   }
 
   static void invalidateProductBarcode(String productId) {
@@ -38,9 +41,8 @@ class BarcodeScannerService {
     // Simulate barcode scanning for web
     await Future.delayed(const Duration(seconds: 1));
 
-    // Randomly select a product for demo
-    final products = MockDataService.getProducts();
-    final randomIndex = DateTime.now().millisecondsSinceEpoch % products.length;
-    return products[randomIndex];
+    // Generate a random barcode and map it to a product
+    final randomBarcode = '${DateTime.now().millisecondsSinceEpoch}';
+    return scanProductFromBarcode(randomBarcode);
   }
 }

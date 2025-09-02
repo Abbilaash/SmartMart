@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
 import '../utils/constants.dart';
+import '../providers/cart_provider.dart';
+import '../services/barcode_scanner_service.dart';
+import '../models/product.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
@@ -21,6 +25,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
   );
 
   String? _lastScannedValue;
+  Product? _scannedProduct;
+  bool _isProcessing = false;
 
   @override
   void dispose() {
@@ -67,9 +73,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                     final Barcode first = barcodes.first;
                     final String? raw = first.rawValue;
                     if (raw == null) return;
-                    setState(() {
-                      _lastScannedValue = raw;
-                    });
+                    
+                    _processBarcode(raw);
                   },
                 ),
               ),
@@ -92,19 +97,150 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  _lastScannedValue == null
-                      ? 'Point the camera at a code'
-                      : 'Scanned: ${_lastScannedValue!}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                if (_isProcessing)
+                  const Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Processing barcode...'),
+                    ],
+                  )
+                else if (_scannedProduct != null)
+                  _buildScannedProductInfo(context)
+                else
+                  Text(
+                    _lastScannedValue == null
+                        ? 'Point the camera at a code'
+                        : 'Scanned: ${_lastScannedValue!}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _processBarcode(String barcodeData) async {
+    if (_isProcessing) return;
+    
+    setState(() {
+      _isProcessing = true;
+      _lastScannedValue = barcodeData;
+      _scannedProduct = null;
+    });
+
+    try {
+      final product = BarcodeScannerService.scanProductFromBarcode(barcodeData);
+      setState(() {
+        _scannedProduct = product;
+        _isProcessing = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isProcessing = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildScannedProductInfo(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Product Found:',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _scannedProduct!.name,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          '\$${_scannedProduct!.currentPrice.toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: AppColors.primaryPurple,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _addToCart(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Add to Cart'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _cancelScan(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _addToCart(BuildContext context) {
+    if (_scannedProduct != null) {
+      final cartProvider = context.read<CartProvider>();
+      cartProvider.addItem(_scannedProduct!);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_scannedProduct!.name} added to cart'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Navigate back to home screen
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _cancelScan() {
+    setState(() {
+      _scannedProduct = null;
+      _lastScannedValue = null;
+    });
   }
 }

@@ -130,7 +130,7 @@ class CartScreen extends StatelessWidget {
                     ),
                   ),
                   child: const Text(
-                    'Place Order',
+                    'Checkout',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
