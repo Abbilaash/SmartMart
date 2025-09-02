@@ -1,0 +1,269 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/cart_provider.dart';
+import '../utils/constants.dart';
+import '../services/barcode_scanner_service.dart';
+
+class BillingScreen extends StatefulWidget {
+  const BillingScreen({super.key});
+
+  @override
+  State<BillingScreen> createState() => _BillingScreenState();
+}
+
+class _BillingScreenState extends State<BillingScreen> {
+  String selectedPaymentMethod = 'upi';
+  bool isProcessing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cartProvider = context.watch<CartProvider>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Checkout'),
+        backgroundColor: AppColors.primaryPurple,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Order Summary
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Order Summary',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ...cartProvider.items.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(item.product.name),
+                          ),
+                          Text('x${item.quantity}'),
+                          const SizedBox(width: 16),
+                          Text(
+                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    )),
+                    const Divider(),
+                    Row(
+                      children: [
+                        const Text(
+                          'Total:',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '\$${cartProvider.totalAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryPurple,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Payment Method Selection
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment Method',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPaymentOption(
+                      'upi',
+                      'UPI Payment',
+                      'Pay using UPI apps like Google Pay, PhonePe',
+                      Icons.account_balance_wallet,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPaymentOption(
+                      'cash',
+                      'Cash on Counter',
+                      'Pay at the counter when collecting items',
+                      Icons.money,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const Spacer(),
+            
+            // Place Order Button
+            ElevatedButton(
+              onPressed: isProcessing ? null : () => _placeOrder(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: isProcessing
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    'Place Order',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption(String value, String title, String subtitle, IconData icon) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedPaymentMethod = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: selectedPaymentMethod == value 
+              ? AppColors.primaryPurple 
+              : Colors.grey[300]!,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selectedPaymentMethod == value 
+                ? AppColors.primaryPurple 
+                : Colors.grey[600],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: selectedPaymentMethod == value 
+                        ? AppColors.primaryPurple 
+                        : Colors.black,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selectedPaymentMethod == value)
+              const Icon(
+                Icons.check_circle,
+                color: AppColors.primaryPurple,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _placeOrder(BuildContext context) async {
+    setState(() {
+      isProcessing = true;
+    });
+
+    try {
+      final cartProvider = context.read<CartProvider>();
+      
+      // Invalidate barcodes for all purchased products
+      for (final item in cartProvider.items) {
+        BarcodeScannerService.invalidateProductBarcode(item.product.id);
+      }
+
+      // Simulate order processing
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Add to purchase history
+      cartProvider.placeOrder(selectedPaymentMethod);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order placed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Navigate back to main screen
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error placing order: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isProcessing = false;
+        });
+      }
+    }
+  }
+}
