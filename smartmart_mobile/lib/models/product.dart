@@ -1,4 +1,3 @@
-
 class Product {
   final String id;
   final String name;
@@ -28,13 +27,19 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
-      id: json['id'],
-      name: json['name'],
-      image: json['image'],
-      originalPrice: json['originalPrice'].toDouble(),
+      id:
+          json['product_id'] ??
+          json['id'], // Support both backend and frontend formats
+      name: json['name'] ?? '',
+      image:
+          json['image'] ?? 'assets/icons/barcode_scanner.svg', // Default image
+      originalPrice: (json['price'] ?? json['originalPrice'] ?? 0.0).toDouble(),
       discountPrice: json['discountPrice']?.toDouble(),
-      stock: json['stock'],
-      category: json['category'],
+      stock:
+          json['stock'] ??
+          json['stck_qty'] ??
+          0, // Support both stock and stck_qty
+      category: json['category'] ?? 'General',
       description: json['description'],
     );
   }

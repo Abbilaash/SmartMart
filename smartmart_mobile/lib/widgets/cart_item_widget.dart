@@ -3,11 +3,24 @@ import 'package:provider/provider.dart';
 import '../models/cart_item.dart';
 import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
+import '../utils/api_config.dart';
 
 class CartItemWidget extends StatelessWidget {
   final CartItem item;
 
   const CartItemWidget({super.key, required this.item});
+
+  Widget _buildDefaultImage() {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,26 +35,17 @@ class CartItemWidget extends StatelessWidget {
             // Product Image
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                item.product.image,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      color: Colors.grey,
-                    ),
-                  );
-                },
-              ),
+              child: item.product.image.startsWith('http')
+                  ? Image.network(
+                      item.product.image,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildDefaultImage();
+                      },
+                    )
+                  : _buildDefaultImage(),
             ),
             const SizedBox(width: 12),
 
@@ -108,53 +112,26 @@ class CartItemWidget extends StatelessWidget {
               ),
             ),
 
-            // Quantity Controls
+            // Quantity Display
             Column(
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        context.read<CartProvider>().updateQuantity(
-                          item.product.id,
-                          item.quantity - 1,
-                        );
-                      },
-                      icon: const Icon(Icons.remove_circle_outline),
-                      iconSize: 20,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primaryPurple.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    'Qty: ${item.quantity}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                       color: AppColors.primaryPurple,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        '${item.quantity}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        context.read<CartProvider>().updateQuantity(
-                          item.product.id,
-                          item.quantity + 1,
-                        );
-                      },
-                      icon: const Icon(Icons.add_circle_outline),
-                      iconSize: 20,
-                      color: AppColors.primaryPurple,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                const SizedBox(height: 8),
                 Text(
                   '\$${item.totalPrice.toStringAsFixed(2)}',
                   style: const TextStyle(
@@ -168,8 +145,12 @@ class CartItemWidget extends StatelessWidget {
 
             // Delete Button
             IconButton(
-              onPressed: () {
-                context.read<CartProvider>().removeItem(item.product.id);
+              onPressed: () async {
+                final cartProvider = context.read<CartProvider>();
+                await cartProvider.removeProductFromCart(
+                  ApiConfig.defaultPhoneNumber,
+                  item.product.id,
+                );
               },
               icon: const Icon(Icons.delete_outline),
               color: Colors.red,

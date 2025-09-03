@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HiPlus, HiPencil, HiTrash, HiSearch } from 'react-icons/hi';
 import Modal from '../components/Modal';
+import { useZxing } from 'react-zxing';
 
 const API_URL = 'http://localhost:5000/admin/product';
 
@@ -8,6 +9,7 @@ const ManageProducts = () => {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isScanOpen, setIsScanOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
     product_id: '',
@@ -238,13 +240,24 @@ const ManageProducts = () => {
           </div>
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">Barcode</label>
-            <input
-              type="text"
-              value={formData.barcode}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-              required
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                className="flex-1 px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
+                placeholder="Scan or enter barcode"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setIsScanOpen(true)}
+                className="px-3 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-700"
+                title="Scan with Camera"
+              >
+                Scan
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">Description</label>
@@ -315,6 +328,48 @@ const ManageProducts = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Camera Scanner Modal */}
+      <Modal isOpen={isScanOpen} onClose={() => setIsScanOpen(false)} title="Scan Barcode">
+        <div className="space-y-4">
+          <p className="text-gray-400 text-sm">Point your camera at the product barcode. The detected code will be filled automatically.</p>
+          <BarcodeScanner
+            onDetected={(value) => {
+              setFormData((prev) => ({ ...prev, barcode: value }));
+              setIsScanOpen(false);
+            }}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsScanOpen(false)}
+              className="px-4 py-2 text-gray-300 border border-slate-600 rounded-lg hover:bg-slate-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+// Inline component to handle camera feed + scanning
+const BarcodeScanner = ({ onDetected }) => {
+  const { ref } = useZxing({
+    onDecodeResult(result) {
+      const text = result.getText();
+      if (text) onDetected(text);
+    },
+    // Optionally restrict formats; defaults scan many formats
+    // formats: [
+    //   'ean_13', 'upc_a', 'code_128', 'qr_code'
+    // ]
+  });
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-700">
+      <video ref={ref} className="w-full h-auto" />
     </div>
   );
 };

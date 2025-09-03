@@ -2,13 +2,18 @@ import 'package:flutter/foundation.dart';
 import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../models/order.dart';
+import '../services/cart_api_service.dart';
 
 class CartProvider with ChangeNotifier {
   final List<CartItem> _items = [];
   final List<Order> _orders = [];
+  bool _isLoading = false;
+  String? _error;
 
   List<CartItem> get items => List.unmodifiable(_items);
   List<Order> get orders => List.unmodifiable(_orders);
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
   int get itemCount => _items.length;
 
@@ -51,6 +56,71 @@ class CartProvider with ChangeNotifier {
   void clear() {
     _items.clear();
     notifyListeners();
+  }
+
+  // Fetch cart products from API
+  Future<void> fetchCartProducts(String phoneNumber) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final products = await CartApiService.getCartProducts(phoneNumber);
+      _items.clear();
+
+      // Convert products to cart items (each product has quantity 1)
+      for (final product in products) {
+        _items.add(CartItem(product: product, quantity: 1));
+      }
+
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Add product to cart via API
+  Future<bool> addProductToCart(String phoneNumber, String productId) async {
+    try {
+      final success = await CartApiService.addProductToCart(
+        phoneNumber,
+        productId,
+      );
+      if (success) {
+        // Refresh cart data from API
+        await fetchCartProducts(phoneNumber);
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Remove product from cart via API
+  Future<bool> removeProductFromCart(
+    String phoneNumber,
+    String productId,
+  ) async {
+    try {
+      final success = await CartApiService.removeProductFromCart(
+        phoneNumber,
+        productId,
+      );
+      if (success) {
+        // Refresh cart data from API
+        await fetchCartProducts(phoneNumber);
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 
   void placeOrder(String paymentMethod) {

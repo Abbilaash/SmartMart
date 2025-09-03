@@ -3,8 +3,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../utils/constants.dart';
 import '../providers/cart_provider.dart';
-import '../services/barcode_scanner_service.dart';
+import '../services/product_api_service.dart';
 import '../models/product.dart';
+import '../utils/api_config.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
@@ -73,7 +74,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                     final Barcode first = barcodes.first;
                     final String? raw = first.rawValue;
                     if (raw == null) return;
-                    
+
                     _processBarcode(raw);
                   },
                 ),
@@ -109,13 +110,11 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                       Text('Processing barcode...'),
                     ],
                   )
-                else if (_scannedProduct != null)
-                  _buildScannedProductInfo(context)
+                else if (_lastScannedValue != null)
+                  _buildScannedBarcodeInfo(context)
                 else
                   Text(
-                    _lastScannedValue == null
-                        ? 'Point the camera at a code'
-                        : 'Scanned: ${_lastScannedValue!}',
+                    'Point the camera at a code',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -130,7 +129,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
 
   void _processBarcode(String barcodeData) async {
     if (_isProcessing) return;
-    
+
     setState(() {
       _isProcessing = true;
       _lastScannedValue = barcodeData;
@@ -138,7 +137,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     });
 
     try {
-      final product = BarcodeScannerService.scanProductFromBarcode(barcodeData);
+      // Fetch product details from API using the barcode
+      final product = await ProductApiService.getProductByBarcode(barcodeData);
       setState(() {
         _scannedProduct = product;
         _isProcessing = false;
@@ -158,29 +158,32 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     }
   }
 
-  Widget _buildScannedProductInfo(BuildContext context) {
+  Widget _buildScannedBarcodeInfo(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Product Found:',
+          'Barcode Scanned:',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          _scannedProduct!.name,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primaryPurple),
           ),
-        ),
-        Text(
-          '\$${_scannedProduct!.currentPrice.toStringAsFixed(2)}',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppColors.primaryPurple,
-            fontWeight: FontWeight.bold,
+          child: Text(
+            _lastScannedValue!,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+              letterSpacing: 1.2,
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -220,20 +223,46 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     );
   }
 
-  void _addToCart(BuildContext context) {
-    if (_scannedProduct != null) {
-      final cartProvider = context.read<CartProvider>();
-      cartProvider.addItem(_scannedProduct!);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_scannedProduct!.name} added to cart'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Navigate back to home screen
-      Navigator.of(context).pop();
+  void _addToCart(BuildContext context) async {
+    if (_lastScannedValue != null) {
+      try {
+        final cartProvider = context.read<CartProvider>();
+        final success = await cartProvider.addProductToCart(
+          ApiConfig.defaultPhoneNumber,
+          _lastScannedValue!,
+        );
+
+        if (success) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Product added to cart successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+          // Navigate back to home screen
+          Navigator.of(context).pop();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to add product to cart'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

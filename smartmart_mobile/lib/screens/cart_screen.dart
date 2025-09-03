@@ -4,9 +4,29 @@ import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/cart_item_widget.dart';
 import 'billing_screen.dart';
+import '../utils/api_config.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch cart data when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCartData();
+    });
+  }
+
+  Future<void> _loadCartData() async {
+    final cartProvider = context.read<CartProvider>();
+    await cartProvider.fetchCartProducts(ApiConfig.defaultPhoneNumber);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +37,58 @@ class CartScreen extends StatelessWidget {
         title: const Text('Cart'),
         backgroundColor: AppColors.primaryPurple,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCartData,
+          ),
+        ],
       ),
-      body: cartProvider.items.isEmpty
-          ? _buildEmptyCart(context)
-          : _buildCartContent(context, cartProvider),
+      body: _buildBody(context, cartProvider),
     );
+  }
+
+  Widget _buildBody(BuildContext context, CartProvider cartProvider) {
+    if (cartProvider.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (cartProvider.error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading cart',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.red[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              cartProvider.error!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.red[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadCartData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return cartProvider.items.isEmpty
+        ? _buildEmptyCart(context)
+        : _buildCartContent(context, cartProvider);
   }
 
   Widget _buildEmptyCart(BuildContext context) {
