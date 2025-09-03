@@ -3,7 +3,6 @@ import '../utils/constants.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../models/order.dart';
-import '../models/cart_item.dart';
 
 class PurchasesScreen extends StatelessWidget {
   const PurchasesScreen({super.key});

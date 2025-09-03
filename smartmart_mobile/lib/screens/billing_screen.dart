@@ -224,6 +224,9 @@ class _BillingScreenState extends State<BillingScreen> {
       isProcessing = true;
     });
 
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       final cartProvider = context.read<CartProvider>();
       
@@ -239,7 +242,7 @@ class _BillingScreenState extends State<BillingScreen> {
       cartProvider.placeOrder(selectedPaymentMethod);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Order placed successfully!'),
             backgroundColor: Colors.green,
@@ -247,11 +250,11 @@ class _BillingScreenState extends State<BillingScreen> {
         );
         
         // Navigate back to main screen
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        navigator.popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Error placing order: ${e.toString()}'),
             backgroundColor: Colors.red,

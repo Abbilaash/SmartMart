@@ -30,7 +30,7 @@ class QRScannerService {
   static void invalidateProductQR(String productId) {
     // In real implementation, this would mark the QR code as used/invalid
     // For now, we'll just simulate this
-    print('QR code invalidated for product: $productId');
+    debugPrint('QR code invalidated for product: $productId');
   }
 
   // Web-compatible QR scanning simulation

@@ -25,7 +25,7 @@ class BarcodeScannerService {
   static String generateProductBarcode(String productId) {
     // Generate a realistic-looking barcode for demo purposes
     // In real implementation, this would generate a proper barcode
-    final baseBarcode = '1234567890123'; // 13-digit EAN-13 format
+    const baseBarcode = '1234567890123'; // 13-digit EAN-13 format
     final productNum = int.tryParse(productId) ?? 1;
     return '${baseBarcode.substring(0, 12)}$productNum';
   }
@@ -33,7 +33,7 @@ class BarcodeScannerService {
   static void invalidateProductBarcode(String productId) {
     // In real implementation, this would mark the barcode as used/invalid
     // For now, we'll just simulate this
-    print('Barcode invalidated for product: $productId');
+    debugPrint('Barcode invalidated for product: $productId');
   }
 
   // Web-compatible barcode scanning simulation
