@@ -64,7 +64,7 @@ class CartItemWidget extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (item.product.isDiscounted) ...[
+                      if (item.product.isDiscounted || item.product.discountPrice != null) ...[
                         Text(
                           '\$${item.product.originalPrice.toStringAsFixed(2)}',
                           style: const TextStyle(
@@ -79,7 +79,7 @@ class CartItemWidget extends StatelessWidget {
                         '\$${item.product.currentPrice.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: item.product.isDiscounted
+                          color: (item.product.isDiscounted || item.product.discountPrice != null)
                               ? AppColors.primaryPurple
                               : Colors.black,
                           fontSize: 14,
@@ -87,7 +87,7 @@ class CartItemWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (item.product.isDiscounted) ...[
+                  if (item.product.isDiscounted || item.product.discountPrice != null) ...[
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(

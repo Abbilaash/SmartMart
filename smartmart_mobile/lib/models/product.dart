@@ -26,19 +26,21 @@ class Product {
       : 0.0;
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Handle backend discount data
+    double? discountPrice;
+    if (json['discount_price'] != null) {
+      discountPrice = json['discount_price'].toDouble();
+    } else if (json['discountPrice'] != null) {
+      discountPrice = json['discountPrice'].toDouble();
+    }
+    
     return Product(
-      id:
-          json['product_id'] ??
-          json['id'], // Support both backend and frontend formats
+      id: json['product_id'] ?? json['id'], // Support both backend and frontend formats
       name: json['name'] ?? '',
-      image:
-          json['image'] ?? 'assets/icons/barcode_scanner.svg', // Default image
+      image: json['image'] ?? 'assets/icons/barcode_scanner.svg', // Default image
       originalPrice: (json['price'] ?? json['originalPrice'] ?? 0.0).toDouble(),
-      discountPrice: json['discountPrice']?.toDouble(),
-      stock:
-          json['stock'] ??
-          json['stck_qty'] ??
-          0, // Support both stock and stck_qty
+      discountPrice: discountPrice,
+      stock: json['stock'] ?? json['stck_qty'] ?? 0, // Support both stock and stck_qty
       category: json['category'] ?? 'General',
       description: json['description'],
     );

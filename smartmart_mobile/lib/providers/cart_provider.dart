@@ -68,9 +68,26 @@ class CartProvider with ChangeNotifier {
       final products = await CartApiService.getCartProducts(phoneNumber);
       _items.clear();
 
-      // Convert products to cart items (each product has quantity 1)
+      // Convert products to cart items using backend data
       for (final product in products) {
-        _items.add(CartItem(product: product, quantity: 1));
+        // Create a product object with discount information
+        final productModel = Product(
+          id: product['product_id'],
+          name: product['name'],
+          image: 'assets/icons/barcode_scanner.svg', // Default image
+          originalPrice: product['price'].toDouble(),
+          discountPrice: product['discount_price'] != product['price']
+              ? product['discount_price'].toDouble()
+              : null,
+          stock: 0, // Not needed for cart display
+          category: 'General',
+          description: null,
+        );
+
+        // Use quantity from backend
+        final quantity = product['quantity'] ?? 1;
+
+        _items.add(CartItem(product: productModel, quantity: quantity));
       }
 
       _error = null;

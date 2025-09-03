@@ -29,31 +29,47 @@ def admin_login():
 def add_product():
     data = request.get_json()
     required_fields = [
-        'product_id', 'name', 'barcode', 'description', 'price',
-        'discount_id', 'stck_qty', 'image_url', 'is_active', 'created_at'
+        'name', 'barcode', 'description', 'price',
+        'stck_qty', 'image_url', 'is_active', 'created_at'
     ]
     if not data or not all(field in data for field in required_fields):
         return jsonify({'message': 'Missing required fields'}), 400
     db = get_db()
-    # Optionally, check for duplicate product_id or barcode
-    if db.products.find_one({'product_id': data['product_id']}):
+    # Use barcode as product_id as per requirement
+    product_id = data.get('barcode')
+    if not product_id:
+        return jsonify({'message': 'Barcode is required'}), 400
+    # Duplicate checks
+    if db.products.find_one({'product_id': product_id}):
         return jsonify({'message': 'Product ID already exists'}), 400
     if db.products.find_one({'barcode': data['barcode']}):
         return jsonify({'message': 'Barcode already exists'}), 400
     # Insert product
     db.products.insert_one({
-        'product_id': data['product_id'],
+        'product_id': product_id,
         'name': data['name'],
         'barcode': data['barcode'],
         'description': data['description'],
         'price': float(data['price']),
-        'discount_id': data['discount_id'],
+        'discount_id': data.get('discount_id', ''),
         'stck_qty': int(data['stck_qty']),
         'image_url': data['image_url'],
         'is_active': bool(data['is_active']),
         'created_at': data['created_at']
     })
     return jsonify({'message': 'Product added successfully'}), 201
+
+@admin_bp.route('/admin/product/delete_product', methods=['DELETE'])
+def delete_product():
+    data = request.get_json(silent=True) or {}
+    product_id = data.get('product_id') or data.get('barcode')
+    if not product_id:
+        return jsonify({'message': 'Missing product_id'}), 400
+    db = get_db()
+    result = db.products.delete_one({'product_id': product_id})
+    if result.deleted_count == 0:
+        return jsonify({'message': 'Product not found'}), 404
+    return jsonify({'message': 'Product deleted successfully'}), 200
 
 @admin_bp.route('/admin/product/update_product', methods=['PUT'])
 def update_product():
@@ -137,22 +153,56 @@ def mark_order_delivered():
 def get_weekly_sales():
     db = get_db()
     try:
-        # Get the weekly sales data from the database
-        weekly_sales = db.weekly_sales.find_one({})
-        if not weekly_sales:
-            return jsonify({'message': 'Weekly sales data not found'}), 404
-        
-        # Convert the data to the format expected by the frontend
-        sales_data = [
-            {'name': 'Sun', 'sales': weekly_sales.get('Sun', 0)},
-            {'name': 'Mon', 'sales': weekly_sales.get('Mon', 0)},
-            {'name': 'Tues', 'sales': weekly_sales.get('Tues', 0)},
-            {'name': 'Wed', 'sales': weekly_sales.get('Wed', 0)},
-            {'name': 'Thurs', 'sales': weekly_sales.get('Thurs', 0)},
-            {'name': 'Fri', 'sales': weekly_sales.get('Fri', 0)},
-            {'name': 'Sat', 'sales': weekly_sales.get('Sat', 0)}
+        # Compute last 7 days range [start_of_day 6 days ago, start_of_tomorrow)
+        today = datetime.now().date()
+        start_date = today.fromordinal(today.toordinal() - 6)
+        start_dt = datetime(start_date.year, start_date.month, start_date.day)
+        end_dt = datetime(today.year, today.month, today.day)  # start of today
+        # end is start of tomorrow
+        from datetime import timedelta
+        end_dt = end_dt + timedelta(days=1)
+
+        # Build aggregation to coerce 'date' (which may be string) to date and filter last 7 days
+        pipeline = [
+            {
+                '$addFields': {
+                    'orderDate': {
+                        '$cond': [
+                            {'$eq': [{'$type': '$date'}, 'date']},
+                            '$date',
+                            {'$toDate': '$date'}
+                        ]
+                    }
+                }
+            },
+            {
+                '$match': {
+                    'orderDate': {'$gte': start_dt, '$lt': end_dt}
+                }
+            },
+            {
+                '$group': {
+                    '_id': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$orderDate'}},
+                    'sales': {'$sum': '$total_amount'}
+                }
+            }
         ]
-        
+
+        results = list(db.orders.aggregate(pipeline))
+        sales_by_date = {r['_id']: r['sales'] for r in results}
+
+        # Prepare 7-day series chronologically
+        day_names = ['Sun', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat']
+        sales_data = []
+        for offset in range(6, -1, -1):
+            d = today.fromordinal(today.toordinal() - offset)
+            key = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
+            name = day_names[d.weekday()] if hasattr(d, 'weekday') else ''
+            # Python's weekday(): Mon=0..Sun=6; adjust to our labels
+            # Convert: Mon(0)->'Mon', ... Sun(6)->'Sun'
+            name = ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'][d.weekday()]
+            sales_data.append({'name': name, 'sales': float(sales_by_date.get(key, 0))})
+
         return jsonify({'sales_data': sales_data}), 200
     except Exception as e:
         return jsonify({'message': f'Error fetching weekly sales: {str(e)}'}), 500
@@ -201,6 +251,167 @@ def get_inventory_value():
         return jsonify({'total_inventory_value': total_inventory_value}), 200
     except Exception as e:
         return jsonify({'message': f'Error fetching inventory value: {str(e)}'}), 500
+
+# Discount Management APIs
+@admin_bp.route('/admin/discounts/get_discounts', methods=['GET'])
+def get_discounts():
+    db = get_db()
+    try:
+        discounts = list(db.discounts.find({}))
+        for discount in discounts:
+            discount['_id'] = str(discount['_id'])
+            # Convert dates to string for JSON serialization
+            if 'start_date' in discount:
+                discount['start_date'] = discount['start_date'].strftime('%Y-%m-%d')
+            if 'end_date' in discount:
+                discount['end_date'] = discount['end_date'].strftime('%Y-%m-%d')
+        return jsonify({'discounts': discounts}), 200
+    except Exception as e:
+        return jsonify({'message': f'Error fetching discounts: {str(e)}'}), 500
+
+@admin_bp.route('/admin/discounts/add_discount', methods=['POST'])
+def add_discount():
+    data = request.get_json()
+    required_fields = ['name', 'percentage', 'start_date', 'end_date', 'product_barcode']
+    if not data or not all(field in data for field in required_fields):
+        return jsonify({'message': 'Missing required fields'}), 400
+    
+    db = get_db()
+    
+    # Check if product exists
+    product = db.products.find_one({'barcode': data['product_barcode']})
+    if not product:
+        return jsonify({'message': 'Product not found with this barcode'}), 404
+    
+    # Check if discount already exists for this product
+    existing_discount = db.discounts.find_one({'product_barcode': data['product_barcode'], 'status': 'Active'})
+    if existing_discount:
+        return jsonify({'message': 'Product already has an active discount'}), 400
+    
+    # Create discount
+    discount_data = {
+        'name': data['name'],
+        'percentage': int(data['percentage']),
+        'start_date': datetime.strptime(data['start_date'], '%Y-%m-%d'),
+        'end_date': datetime.strptime(data['end_date'], '%Y-%m-%d'),
+        'product_barcode': data['product_barcode'],
+        'product_name': product['name'],
+        'status': 'Active',
+        'created_at': datetime.now()
+    }
+    
+    result = db.discounts.insert_one(discount_data)
+    
+    # Update product with discount_id
+    db.products.update_one(
+        {'barcode': data['product_barcode']},
+        {'$set': {'discount_id': str(result.inserted_id)}}
+    )
+    
+    return jsonify({'message': 'Discount added successfully', 'discount_id': str(result.inserted_id)}), 201
+
+@admin_bp.route('/admin/discounts/update_discount', methods=['PUT'])
+def update_discount():
+    data = request.get_json()
+    if not data or 'discount_id' not in data:
+        return jsonify({'message': 'Missing discount_id'}), 400
+    
+    db = get_db()
+    
+    try:
+        discount_id = ObjectId(data['discount_id'])
+    except Exception:
+        return jsonify({'message': 'Invalid discount_id'}), 400
+    
+    # Prepare update fields
+    update_fields = {}
+    if 'name' in data:
+        update_fields['name'] = data['name']
+    if 'percentage' in data:
+        update_fields['percentage'] = int(data['percentage'])
+    if 'start_date' in data:
+        update_fields['start_date'] = datetime.strptime(data['start_date'], '%Y-%m-%d')
+    if 'end_date' in data:
+        update_fields['end_date'] = datetime.strptime(data['end_date'], '%Y-%m-%d')
+    if 'status' in data:
+        update_fields['status'] = data['status']
+    
+    if not update_fields:
+        return jsonify({'message': 'No fields to update'}), 400
+    
+    result = db.discounts.update_one(
+        {'_id': discount_id},
+        {'$set': update_fields}
+    )
+    
+    if result.matched_count == 0:
+        return jsonify({'message': 'Discount not found'}), 404
+    
+    return jsonify({'message': 'Discount updated successfully'}), 200
+
+@admin_bp.route('/admin/discounts/delete_discount', methods=['DELETE'])
+def delete_discount():
+    data = request.get_json()
+    if not data or 'discount_id' not in data:
+        return jsonify({'message': 'Missing discount_id'}), 400
+    
+    db = get_db()
+    
+    try:
+        discount_id = ObjectId(data['discount_id'])
+    except Exception:
+        return jsonify({'message': 'Invalid discount_id'}), 400
+    
+    # Get discount details before deletion
+    discount = db.discounts.find_one({'_id': discount_id})
+    if not discount:
+        return jsonify({'message': 'Discount not found'}), 404
+    
+    # Remove discount_id from product
+    if 'product_barcode' in discount:
+        db.products.update_one(
+            {'barcode': discount['product_barcode']},
+            {'$unset': {'discount_id': ''}}
+        )
+    
+    # Delete discount
+    result = db.discounts.delete_one({'_id': discount_id})
+    
+    if result.deleted_count == 0:
+        return jsonify({'message': 'Discount not found'}), 404
+    
+    return jsonify({'message': 'Discount deleted successfully'}), 200
+
+@admin_bp.route('/admin/discounts/toggle_status', methods=['PUT'])
+def toggle_discount_status():
+    data = request.get_json()
+    if not data or 'discount_id' not in data:
+        return jsonify({'message': 'Missing discount_id'}), 400
+    
+    db = get_db()
+    
+    try:
+        discount_id = ObjectId(data['discount_id'])
+    except Exception:
+        return jsonify({'message': 'Invalid discount_id'}), 400
+    
+    # Get current discount
+    discount = db.discounts.find_one({'_id': discount_id})
+    if not discount:
+        return jsonify({'message': 'Discount not found'}), 404
+    
+    # Toggle status
+    new_status = 'Inactive' if discount['status'] == 'Active' else 'Active'
+    
+    result = db.discounts.update_one(
+        {'_id': discount_id},
+        {'$set': {'status': new_status}}
+    )
+    
+    if result.matched_count == 0:
+        return jsonify({'message': 'Discount not found'}), 404
+    
+    return jsonify({'message': f'Discount status changed to {new_status}'}), 200
 
 # Payments API Endpoints
 @admin_bp.route('/admin/payments/transactions', methods=['GET'])

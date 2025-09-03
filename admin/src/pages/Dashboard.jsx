@@ -90,11 +90,7 @@ const Dashboard = () => {
   };
 
   const recentActivity = [
-    { id: 1, action: 'New order #1234', user: 'John Smith', time: '2 mins ago', type: 'order' },
-    { id: 2, action: 'Product "iPhone 15" updated', user: 'Admin', time: '5 mins ago', type: 'product' },
-    { id: 3, action: 'Payment received #5678', user: 'Sarah Johnson', time: '10 mins ago', type: 'payment' },
-    { id: 4, action: 'New user registered', user: 'Mike Wilson', time: '15 mins ago', type: 'user' },
-    { id: 5, action: 'Inventory low alert', user: 'System', time: '20 mins ago', type: 'alert' }
+    { id: 1, action: '', user: '', time: '', type: '' }
   ];
 
   const getActivityColor = (type) => {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import '../../widgets/auth/custom_text_field.dart';
-import '../../widgets/auth/google_sign_in_button.dart';
+import '../../services/auth_api_service.dart';
 import 'signup_screen.dart';
 import '../home_screen.dart';
 
@@ -14,14 +14,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -31,9 +31,22 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = true;
       });
-
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        await AuthApiService.login(
+          phoneNumber: _phoneController.text.trim(),
+          password: _passwordController.text,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
 
       setState(() {
         _isLoading = false;
@@ -93,35 +106,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                         Text(
                           AppStrings.appName,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryPurple,
-                          ),
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryPurple,
+                              ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Welcome back!',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.textDarkGrey,
-                          ),
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: AppColors.textDarkGrey),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
 
-                        // Email Field
+                        // Phone Field
                         CustomTextField(
-                          controller: _emailController,
-                          labelText: 'Email',
-                          hintText: 'Enter your email',
-                          keyboardType: TextInputType.emailAddress,
-                          prefixIcon: Icons.email_outlined,
+                          controller: _phoneController,
+                          labelText: 'Mobile Number',
+                          hintText: 'Enter your mobile number',
+                          keyboardType: TextInputType.phone,
+                          prefixIcon: Icons.phone_outlined,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Email is required';
+                              return 'Mobile number is required';
                             }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                              return 'Please enter a valid email';
+                            if (value.length < 10) {
+                              return 'Please enter a valid mobile number';
                             }
                             return null;
                           },
@@ -137,7 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           prefixIcon: Icons.lock_outlined,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                              _obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
                             ),
                             onPressed: () {
                               setState(() {
@@ -166,36 +181,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.white,
+                                    ),
                                   ),
                                 )
                               : const Text('Login'),
                         ),
                         const SizedBox(height: 16),
 
-                        // Divider
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'OR',
-                                style: TextStyle(
-                                  color: AppColors.textDarkGrey.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Google Sign-In Button
-                        GoogleSignInButton(
-                          onPressed: _handleGoogleSignIn,
-                        ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 8),
 
                         // Sign Up Link
                         Row(
@@ -203,9 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             const Text(
                               "Don't have an account? ",
-                              style: TextStyle(
-                                color: AppColors.textDarkGrey,
-                              ),
+                              style: TextStyle(color: AppColors.textDarkGrey),
                             ),
                             GestureDetector(
                               onTap: () {

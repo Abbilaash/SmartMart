@@ -33,10 +33,21 @@ const Orders = () => {
 
   const getDeliveryStatusColor = (status) => {
     switch (status) {
+      case 'Done': return 'bg-emerald-500 text-white';
       case 'Delivered': return 'bg-emerald-500 text-white';
       case 'Pending': return 'bg-blue-500 text-white';
       case 'Cancelled': return 'bg-red-500 text-white';
       default: return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getDeliveryStatusText = (status) => {
+    switch (status) {
+      case 'Done': return 'Done';
+      case 'Delivered': return 'Delivered';
+      case 'Pending': return 'Pending';
+      case 'Cancelled': return 'Cancelled';
+      default: return status || 'Unknown';
     }
   };
 
@@ -63,7 +74,18 @@ const Orders = () => {
 
   const filteredOrders = filterStatus === 'All'
     ? orders
-    : orders.filter(order => order.delivery_status === filterStatus);
+    : orders.filter(order => {
+        if (filterStatus === 'Done') {
+          return order.delivery_status === 'Done';
+        } else if (filterStatus === 'Delivered') {
+          return order.delivery_status === 'Delivered';
+        } else if (filterStatus === 'Pending') {
+          return order.delivery_status === 'Pending';
+        } else if (filterStatus === 'Cancelled') {
+          return order.delivery_status === 'Cancelled';
+        }
+        return true;
+      });
 
   return (
     <div className="space-y-6">
@@ -81,8 +103,9 @@ const Orders = () => {
               className="pl-10 pr-8 py-2 bg-slate-800 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
             >
               <option value="All">All Orders</option>
-              <option value="Pending">Pending</option>
+              <option value="Done">Done</option>
               <option value="Delivered">Delivered</option>
+              <option value="Pending">Pending</option>
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
@@ -109,10 +132,14 @@ const Orders = () => {
                   <tr className="border-b border-slate-600 hover:bg-slate-700 transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
-                        <span className="text-white font-medium">{order.order_id.slice(0, 5) + '...'}</span>
+                        <span className="text-white font-medium">
+                          {order.order_id.length > 10 
+                            ? '...' + order.order_id.slice(-10) 
+                            : order.order_id}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-white">{order.customer || 'Unknown'}</td>
+                    <td className="py-4 px-6 text-white">{order.customer_name || order.customer || 'Unknown'}</td>
                     <td className="py-4 px-6">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
                         {order.payment_status}
@@ -120,13 +147,13 @@ const Orders = () => {
                     </td>
                     <td className="py-4 px-6">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(order.delivery_status)}`}>
-                        {order.delivery_status}
+                        {getDeliveryStatusText(order.delivery_status)}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-gray-300">{order.date}</td>
-                    <td className="py-4 px-6 text-emerald-400 font-bold">₹{order.total}</td>
+                    <td className="py-4 px-6 text-gray-300">{order.order_date_string || order.date || 'N/A'}</td>
+                    <td className="py-4 px-6 text-emerald-400 font-bold">₹{order.total_amount || order.total}</td>
                     <td className="py-4 px-6">
-                      {order.delivery_status !== 'Delivered' && (
+                      {order.delivery_status !== 'Done' && order.delivery_status !== 'Delivered' && (
                         <button
                           onClick={() => markAsDelivered(order.order_id)}
                           className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-emerald-700 transition-colors"

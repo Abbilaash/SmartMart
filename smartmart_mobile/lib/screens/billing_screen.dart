@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
 import '../services/barcode_scanner_service.dart';
+import '../services/order_api_service.dart'; // Added import for OrderApiService
+import '../utils/api_config.dart'; // Added import for ApiConfig
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -14,6 +16,14 @@ class BillingScreen extends StatefulWidget {
 class _BillingScreenState extends State<BillingScreen> {
   String selectedPaymentMethod = 'upi';
   bool isProcessing = false;
+  final _formKey = GlobalKey<FormState>(); // Added form key
+  final _deliveryAddressController = TextEditingController(); // Added delivery address controller
+
+  @override
+  void dispose() {
+    _deliveryAddressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +139,47 @@ class _BillingScreenState extends State<BillingScreen> {
               ),
             ),
             
+            const SizedBox(height: 24),
+
+            // Delivery Address Form
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delivery Address',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _deliveryAddressController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter your delivery address',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your delivery address';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
             const Spacer(),
             
             // Place Order Button
@@ -227,29 +278,34 @@ class _BillingScreenState extends State<BillingScreen> {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        isProcessing = false;
+      });
+      return;
+    }
+
     try {
       final cartProvider = context.read<CartProvider>();
+      final deliveryAddress = _deliveryAddressController.text.trim();
       
-      // Invalidate barcodes for all purchased products
-      for (final item in cartProvider.items) {
-        BarcodeScannerService.invalidateProductBarcode(item.product.id);
-      }
-
-      // Simulate order processing
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Add to purchase history
-      cartProvider.placeOrder(selectedPaymentMethod);
+      // Call the order API service
+      final orderResponse = await OrderApiService.placeOrder(
+        phoneNumber: ApiConfig.defaultPhoneNumber,
+        paymentMethod: selectedPaymentMethod,
+        deliveryAddress: deliveryAddress,
+      );
 
       if (mounted) {
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Order placed successfully!'),
+          SnackBar(
+            content: Text('Order placed successfully! Order ID: ${orderResponse['order_id']}'),
             backgroundColor: Colors.green,
           ),
         );
         
-        // Navigate back to main screen
+        // Clear cart and navigate back to main screen
+        cartProvider.clear();
         navigator.popUntil((route) => route.isFirst);
       }
     } catch (e) {

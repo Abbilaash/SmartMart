@@ -6,7 +6,7 @@ import '../utils/api_config.dart';
 class CartApiService {
   
   // Fetch products from cart
-  static Future<List<Product>> getCartProducts(String phoneNumber) async {
+  static Future<List<Map<String, dynamic>>> getCartProducts(String phoneNumber) async {
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getCartProducts}'),
@@ -22,7 +22,8 @@ class CartApiService {
         final Map<String, dynamic> data = jsonDecode(response.body);
         final List<dynamic> productsJson = data['products'] ?? [];
         
-        return productsJson.map((json) => Product.fromJson(json)).toList();
+        // Return raw JSON data instead of converting to Product objects
+        return productsJson.map((json) => Map<String, dynamic>.from(json)).toList();
       } else {
         throw Exception('Failed to fetch cart products: ${response.statusCode}');
       }

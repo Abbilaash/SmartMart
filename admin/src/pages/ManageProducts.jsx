@@ -12,7 +12,6 @@ const ManageProducts = () => {
   const [isScanOpen, setIsScanOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
-    product_id: '',
     name: '',
     barcode: '',
     description: '',
@@ -46,7 +45,6 @@ const ManageProducts = () => {
   const handleAddProduct = () => {
     setEditingProduct(null);
     setFormData({
-      product_id: '',
       name: '',
       barcode: '',
       description: '',
@@ -63,7 +61,6 @@ const ManageProducts = () => {
   const handleEditProduct = (product) => {
     setEditingProduct(product);
     setFormData({
-      product_id: product.product_id,
       name: product.name,
       barcode: product.barcode,
       description: product.description,
@@ -77,15 +74,26 @@ const ManageProducts = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteProduct = (id) => {
-    // Implement delete logic if needed
+  const handleDeleteProduct = async (productId) => {
+    try {
+      const res = await fetch(`${API_URL}/delete_product`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId })
+      });
+      if (res.ok) {
+        fetchProducts();
+      }
+    } catch (err) {
+      // noop
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    // Validate required fields
-    if (!formData.product_id || !formData.name || !formData.barcode || !formData.price || !formData.stck_qty) {
+    // Validate required fields (discount is optional; product_id is derived from barcode)
+    if (!formData.name || !formData.barcode || !formData.price || !formData.stck_qty) {
       setError('Please fill all required fields.');
       return;
     }
@@ -97,6 +105,10 @@ const ManageProducts = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
+            // Ensure product_id stays aligned with barcode
+            product_id: formData.barcode,
+            // Only include discount_id if provided
+            discount_id: formData.discount_id || undefined,
             price: parseFloat(formData.price),
             stck_qty: parseInt(formData.stck_qty),
             is_active: Boolean(formData.is_active),
@@ -118,6 +130,10 @@ const ManageProducts = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
+            // Backend uses barcode as product_id
+            product_id: formData.barcode,
+            // Only include discount_id if provided
+            discount_id: formData.discount_id || undefined,
             price: parseFloat(formData.price),
             stck_qty: parseInt(formData.stck_qty),
             is_active: Boolean(formData.is_active),
@@ -218,16 +234,7 @@ const ManageProducts = () => {
       {/* Add/Edit Product Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Edit Product' : 'Add New Product'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">Product ID</label>
-            <input
-              type="text"
-              value={formData.product_id}
-              onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-violet-500 focus:outline-none"
-              required
-            />
-          </div>
+          {/* Product ID removed; barcode will be used as product_id */}
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">Name</label>
             <input
@@ -239,7 +246,7 @@ const ManageProducts = () => {
             />
           </div>
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">Barcode</label>
+            <label className="block text-gray-300 text-sm font-medium mb-2">Barcode (also used as Product ID)</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -361,10 +368,6 @@ const BarcodeScanner = ({ onDetected }) => {
       const text = result.getText();
       if (text) onDetected(text);
     },
-    // Optionally restrict formats; defaults scan many formats
-    // formats: [
-    //   'ean_13', 'upc_a', 'code_128', 'qr_code'
-    // ]
   });
 
   return (
