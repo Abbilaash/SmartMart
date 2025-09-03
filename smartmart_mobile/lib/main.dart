@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/cart_provider.dart';
-import 'screens/main_screen.dart';
+import 'screens/auth/login_screen.dart';
 import 'utils/theme.dart';
 
 void main() {
@@ -18,7 +18,7 @@ class SmartMartApp extends StatelessWidget {
       child: MaterialApp(
         title: 'SmartMart',
         theme: AppTheme.lightTheme,
-        home: const MainScreen(),
+        home: const LoginScreen(),
         debugShowCheckedModeBanner: false,
       ),
     );
