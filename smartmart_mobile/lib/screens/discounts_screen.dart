@@ -240,7 +240,7 @@ class _DiscountsScreenState extends State<DiscountsScreen> {
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   Text(
-                    '\$${originalPrice.toStringAsFixed(2)}',
+                    '₹${originalPrice.toStringAsFixed(2)}',
                     style: TextStyle(
                       decoration: TextDecoration.lineThrough,
                       color: Colors.grey[500],
@@ -254,7 +254,7 @@ class _DiscountsScreenState extends State<DiscountsScreen> {
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   Text(
-                    '\$${discountedPrice.toStringAsFixed(2)}',
+                    '₹${discountedPrice.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: AppColors.primaryPurple,
                       fontSize: 20,
@@ -284,7 +284,7 @@ class _DiscountsScreenState extends State<DiscountsScreen> {
                     Icon(Icons.savings, color: Colors.green[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'You save \$${savings.toStringAsFixed(2)}!',
+                      'You save ₹${savings.toStringAsFixed(2)}!',
                       style: TextStyle(
                         color: Colors.green[700],
                         fontSize: 16,

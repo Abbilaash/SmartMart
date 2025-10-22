@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import '../../widgets/auth/custom_text_field.dart';
 import '../../services/auth_api_service.dart';
-import '../home_screen.dart';
+import '../main_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -59,18 +59,13 @@ class _SignupScreenState extends State<SignupScreen> {
         _isLoading = false;
       });
 
-      // Navigate to home screen
+      // Navigate to main screen
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     }
-  }
-
-  void _handleGoogleSignIn() {
-    debugPrint("Google Sign-In clicked");
-    // TODO: Implement Google Sign-In logic
   }
 
   @override

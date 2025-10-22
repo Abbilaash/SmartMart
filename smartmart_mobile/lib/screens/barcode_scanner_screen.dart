@@ -186,6 +186,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
             ),
           ),
         ),
+        if (_scannedProduct != null) ...[
+          const SizedBox(height: 16),
+          _buildProductInfo(context),
+        ],
         const SizedBox(height: 16),
         Row(
           children: [
@@ -220,6 +224,103 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildProductInfo(BuildContext context) {
+    if (_scannedProduct == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _scannedProduct!.name,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (_scannedProduct!.isDiscounted) ...[
+                Text(
+                  '₹${_scannedProduct!.originalPrice.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    decoration: TextDecoration.lineThrough,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${_scannedProduct!.discountPercentage.toStringAsFixed(0)}% OFF',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '₹${_scannedProduct!.currentPrice.toStringAsFixed(2)}',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: _scannedProduct!.isDiscounted
+                  ? Colors.green[700]
+                  : Colors.black,
+            ),
+          ),
+          if (_scannedProduct!.isDiscounted) ...[
+            const SizedBox(height: 4),
+            Text(
+              'You save ₹${(_scannedProduct!.originalPrice - _scannedProduct!.currentPrice).toStringAsFixed(2)}',
+              style: TextStyle(
+                color: Colors.green[600],
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+            if (_scannedProduct!.discountName != null) ...[
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Text(
+                  _scannedProduct!.discountName!,
+                  style: TextStyle(
+                    color: Colors.blue[700],
+                    fontWeight: FontWeight.w500,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 

@@ -64,9 +64,10 @@ class CartItemWidget extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (item.product.isDiscounted || item.product.discountPrice != null) ...[
+                      if (item.product.isDiscounted ||
+                          item.product.discountPrice != null) ...[
                         Text(
-                          '\$${item.product.originalPrice.toStringAsFixed(2)}',
+                          '₹${item.product.originalPrice.toStringAsFixed(2)}',
                           style: const TextStyle(
                             decoration: TextDecoration.lineThrough,
                             color: Colors.grey,
@@ -76,10 +77,12 @@ class CartItemWidget extends StatelessWidget {
                         const SizedBox(width: 8),
                       ],
                       Text(
-                        '\$${item.product.currentPrice.toStringAsFixed(2)}',
+                        '₹${item.product.currentPrice.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: (item.product.isDiscounted || item.product.discountPrice != null)
+                          color:
+                              (item.product.isDiscounted ||
+                                  item.product.discountPrice != null)
                               ? AppColors.primaryPurple
                               : Colors.black,
                           fontSize: 14,
@@ -87,7 +90,8 @@ class CartItemWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (item.product.isDiscounted || item.product.discountPrice != null) ...[
+                  if (item.product.isDiscounted ||
+                      item.product.discountPrice != null) ...[
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -116,11 +120,16 @@ class CartItemWidget extends StatelessWidget {
             Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryPurple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primaryPurple.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.primaryPurple.withOpacity(0.3),
+                    ),
                   ),
                   child: Text(
                     'Qty: ${item.quantity}',
@@ -133,7 +142,7 @@ class CartItemWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '\$${item.totalPrice.toStringAsFixed(2)}',
+                  '₹${item.totalPrice.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,

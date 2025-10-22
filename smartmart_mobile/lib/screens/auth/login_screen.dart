@@ -3,7 +3,7 @@ import '../../utils/constants.dart';
 import '../../widgets/auth/custom_text_field.dart';
 import '../../services/auth_api_service.dart';
 import 'signup_screen.dart';
-import '../home_screen.dart';
+import '../main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,19 +52,16 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
       });
 
-      // Navigate to home screen
+      // Navigate to main screen (with navbar)
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     }
   }
 
-  void _handleGoogleSignIn() {
-    debugPrint("Google Sign-In clicked");
-    // TODO: Implement Google Sign-In logic
-  }
+  // Google Sign-In is not implemented currently.
 
   @override
   Widget build(BuildContext context) {

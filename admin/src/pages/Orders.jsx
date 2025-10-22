@@ -16,7 +16,9 @@ const Orders = () => {
     try {
       const res = await fetch(`${API_URL}/get_orders`);
       const data = await res.json();
-      setOrders(data.orders || []);
+      // Display newest orders first: reverse the received list
+      const list = data.orders || [];
+      setOrders(Array.isArray(list) ? list.slice().reverse() : []);
     } catch (err) {
       setOrders([]);
     }
@@ -24,7 +26,7 @@ const Orders = () => {
 
   const getPaymentStatusColor = (status) => {
     switch (status) {
-      case 'Paid': return 'bg-emerald-500 text-white';
+      case 'Completed': return 'bg-emerald-500 text-white';
       case 'Unpaid': return 'bg-amber-500 text-white';
       case 'Failed': return 'bg-red-500 text-white';
       default: return 'bg-gray-500 text-white';

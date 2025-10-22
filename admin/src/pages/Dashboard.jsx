@@ -20,6 +20,7 @@ const Dashboard = () => {
     fetchInventoryValue();
   }, []);
 
+  
   const fetchWeeklySales = async () => {
     try {
       setLoading(true);

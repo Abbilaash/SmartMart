@@ -115,8 +115,8 @@ def get_orders():
                 'customer': '$user_info.name',
                 'payment_status': {
                     '$cond': [
-                        {'$eq': ['$payment_status', 'success']},
-                        'Paid',
+                        {'$eq': ['$payment_status', 'Completed']},
+                        'Completed',
                         {'$cond': [{'$eq': ['$payment_status', 'failed']}, 'Failed', 'Unpaid']}
                     ]
                 },
@@ -155,53 +155,55 @@ def get_weekly_sales():
     try:
         # Compute last 7 days range [start_of_day 6 days ago, start_of_tomorrow)
         today = datetime.now().date()
-        start_date = today.fromordinal(today.toordinal() - 6)
-        start_dt = datetime(start_date.year, start_date.month, start_date.day)
-        end_dt = datetime(today.year, today.month, today.day)  # start of today
-        # end is start of tomorrow
         from datetime import timedelta
-        end_dt = end_dt + timedelta(days=1)
+        start_date = today - timedelta(days=6)
+        start_dt = datetime(start_date.year, start_date.month, start_date.day)
+        end_dt = datetime(today.year, today.month, today.day) + timedelta(days=1)
 
-        # Build aggregation to coerce 'date' (which may be string) to date and filter last 7 days
+        # Aggregate payments collection by created_at (which may be datetime)
         pipeline = [
             {
                 '$addFields': {
-                    'orderDate': {
+                    'paymentDate': {
                         '$cond': [
-                            {'$eq': [{'$type': '$date'}, 'date']},
-                            '$date',
-                            {'$toDate': '$date'}
+                            {'$eq': [{'$type': '$created_at'}, 'date']},
+                            '$created_at',
+                            {'$toDate': '$created_at'}
                         ]
                     }
                 }
             },
             {
                 '$match': {
-                    'orderDate': {'$gte': start_dt, '$lt': end_dt}
+                    'paymentDate': {'$gte': start_dt, '$lt': end_dt}
                 }
             },
             {
                 '$group': {
-                    '_id': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$orderDate'}},
-                    'sales': {'$sum': '$total_amount'}
+                    '_id': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$paymentDate'}},
+                    'sales': {'$sum': '$amount'}
                 }
             }
         ]
 
-        results = list(db.orders.aggregate(pipeline))
+        results = list(db.payments.aggregate(pipeline))
         sales_by_date = {r['_id']: r['sales'] for r in results}
 
         # Prepare 7-day series chronologically
-        day_names = ['Sun', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat']
         sales_data = []
         for offset in range(6, -1, -1):
-            d = today.fromordinal(today.toordinal() - offset)
+            d = today - timedelta(days=offset)
             key = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
-            name = day_names[d.weekday()] if hasattr(d, 'weekday') else ''
-            # Python's weekday(): Mon=0..Sun=6; adjust to our labels
-            # Convert: Mon(0)->'Mon', ... Sun(6)->'Sun'
+            # Convert paise to rupees if amounts stored in paise (common case)
+            total_paise = sales_by_date.get(key, 0)
+            try:
+                total_rupees = float(total_paise) if total_paise is not None else 0.0
+            except Exception:
+                # If already in rupees, just cast
+                total_rupees = float(total_paise or 0)
+
             name = ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'][d.weekday()]
-            sales_data.append({'name': name, 'sales': float(sales_by_date.get(key, 0))})
+            sales_data.append({'name': name, 'sales': round(total_rupees, 2)})
 
         return jsonify({'sales_data': sales_data}), 200
     except Exception as e:
@@ -428,35 +430,77 @@ def get_transactions():
         if status_filter != 'All':
             filter_query['payment_status'] = status_filter
         
+        # date_filter may be 'All', a full day like '2025-10-16', or a month like '2025-10'
         if date_filter != 'All':
-            if date_filter == 'Today':
-                today = datetime.now().strftime('%Y-%m-%d')
-                filter_query['transaction_date'] = {'$regex': today}
-            elif date_filter == 'This Month':
-                current_month = datetime.now().strftime('%Y-%m')
-                filter_query['transaction_date'] = {'$regex': current_month}
+            # If user passed an exact day (YYYY-MM-DD)
+            if isinstance(date_filter, str) and len(date_filter) == 10 and date_filter[4] == '-':
+                filter_query['created_at'] = {'$regex': date_filter}
+            # If user passed a month (YYYY-MM)
+            elif isinstance(date_filter, str) and len(date_filter) == 7 and date_filter[4] == '-':
+                filter_query['created_at'] = {'$regex': date_filter}
+            else:
+                # legacy handling: accept tokens like 'Today' or 'This Month'
+                if date_filter == 'Today':
+                    today = datetime.now().strftime('%Y-%m-%d')
+                    filter_query['created_at'] = {'$regex': today}
+                elif date_filter == 'This Month':
+                    current_month = datetime.now().strftime('%Y-%m')
+                    filter_query['created_at'] = {'$regex': current_month}
         
-        # Get transactions with pagination
+        # Get transactions (payments) with pagination
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
         skip = (page - 1) * limit
-        
-        transactions = list(db.transactions.find(filter_query).sort('transaction_date', -1).skip(skip).limit(limit))
-        
-        # Convert ObjectId to string for JSON serialization
-        for transaction in transactions:
-            transaction['_id'] = str(transaction['_id'])
-            # Convert datetime to string for frontend
-            if 'transaction_date' in transaction:
-                transaction['transaction_date'] = transaction['transaction_date'].strftime('%Y-%m-%d')
-            if 'created_at' in transaction:
-                transaction['created_at'] = transaction['created_at'].strftime('%Y-%m-%d')
-            if 'updated_at' in transaction:
-                transaction['updated_at'] = transaction['updated_at'].strftime('%Y-%m-%d')
-        
-        # Get total count for pagination
-        total_count = db.transactions.count_documents(filter_query)
-        
+
+        payments_cursor = db.payments.find(filter_query).sort('created_at', -1).skip(skip).limit(limit)
+        payments = list(payments_cursor)
+
+        transactions = []
+        for p in payments:
+            # Build the transaction object expected by frontend
+            t = {}
+            t['_id'] = str(p.get('_id'))
+            t['transaction_id'] = p.get('transaction_id') or p.get('txn_id') or ''
+            t['order_id'] = p.get('order_id')
+
+            # Resolve customer name from users collection if possible
+            user_id = p.get('user_id')
+            customer_name = None
+            if user_id:
+                user = db.users.find_one({'user_id': user_id}, {'name': 1})
+                if user:
+                    customer_name = user.get('name')
+            t['customer_name'] = customer_name or p.get('customer_name') or ''
+
+            # Amount: stored as paise -> convert to rupees float
+            amt = p.get('amount', 0)
+            try:
+                # If amount is stored in smallest currency unit (paise), divide by 100
+                t['amount'] = round(float(amt) / 100.0, 2)
+            except Exception:
+                t['amount'] = amt
+
+            # payment_method in collection -> map to payment_mode expected by frontend
+            pm = p.get('payment_method') or p.get('payment_mode') or ''
+            if isinstance(pm, str):
+                t['payment_mode'] = pm.title()  # 'card' -> 'Card'
+            else:
+                t['payment_mode'] = pm
+
+            t['payment_status'] = p.get('payment_status')
+
+            # transaction date from created_at
+            created_at = p.get('created_at')
+            if created_at and hasattr(created_at, 'strftime'):
+                t['transaction_date'] = created_at.strftime('%Y-%m-%d')
+            else:
+                t['transaction_date'] = str(created_at or '')
+
+            transactions.append(t)
+
+        # Get total count for pagination (based on filter applied to payments)
+        total_count = db.payments.count_documents(filter_query)
+
         return jsonify({
             'transactions': transactions,
             'total_count': total_count,
@@ -489,42 +533,113 @@ def get_monthly_revenue():
                 current_month = datetime.now().strftime('%Y-%m')
                 filter_query['transaction_date'] = {'$regex': current_month}
         
-        # Aggregate transactions by month for the current year
-        current_year = datetime.now().year
+        # Build match conditions for pipeline (handle status and date filters reliably)
+        from datetime import timedelta
+        match_conditions = {}
+
+        # Normalize status filter: if provided, map common "completed" labels to actual DB values
+        if status_filter != 'All':
+            sf = status_filter.lower()
+            if sf in ('completed', 'paid', 'success'):
+                # match any of the common success labels
+                match_conditions['payment_status'] = {'$in': ['success', 'paid', 'Completed', 'Paid', 'completed', 'Success']}
+            else:
+                match_conditions['payment_status'] = status_filter
+
+        # Date filter: convert tokens or explicit YYYY-MM(-DD) into a date range on payDate
+        date_range = {}
+        now = datetime.now()
+        if date_filter != 'All':
+            if date_filter == 'Today':
+                start = datetime(now.year, now.month, now.day)
+                end = start + timedelta(days=1)
+                date_range = {'$gte': start, '$lt': end}
+            elif date_filter == 'This Month':
+                start = datetime(now.year, now.month, 1)
+                # get start of next month
+                if now.month == 12:
+                    end = datetime(now.year + 1, 1, 1)
+                else:
+                    end = datetime(now.year, now.month + 1, 1)
+                date_range = {'$gte': start, '$lt': end}
+            else:
+                # YYYY-MM-DD or YYYY-MM
+                try:
+                    if len(date_filter) == 10:
+                        parts = [int(x) for x in date_filter.split('-')]
+                        start = datetime(parts[0], parts[1], parts[2])
+                        end = start + timedelta(days=1)
+                        date_range = {'$gte': start, '$lt': end}
+                    elif len(date_filter) == 7:
+                        parts = [int(x) for x in date_filter.split('-')]
+                        start = datetime(parts[0], parts[1], 1)
+                        if parts[1] == 12:
+                            end = datetime(parts[0] + 1, 1, 1)
+                        else:
+                            end = datetime(parts[0], parts[1] + 1, 1)
+                        date_range = {'$gte': start, '$lt': end}
+                except Exception:
+                    date_range = {}
+
+        # Aggregate payments by month for the current year (or filtered range)
         pipeline = [
-            {'$match': {
-                **filter_query,
-                'payment_status': 'Completed',  # Only count completed transactions
-                'transaction_date': {
-                    '$gte': datetime(current_year, 1, 1),
-                    '$lt': datetime(current_year + 1, 1, 1)
+            {'$addFields': {
+                'payDate': {
+                    '$cond': [
+                        {'$eq': [{'$type': '$created_at'}, 'date']},
+                        '$created_at',
+                        {'$toDate': '$created_at'}
+                    ]
                 }
             }},
+        ]
+
+        # Build the $match stage
+        match_stage = {}
+        if match_conditions:
+            match_stage.update(match_conditions)
+
+        # If date_range exists, apply it on payDate
+        if date_range:
+            match_stage['payDate'] = date_range
+
+        # If match_stage has entries, add to pipeline
+        if match_stage:
+            pipeline.append({'$match': match_stage})
+
+        # Group by year+month
+        pipeline.extend([
             {'$group': {
                 '_id': {
-                    'year': {'$year': '$transaction_date'},
-                    'month': {'$month': '$transaction_date'}
+                    'year': {'$year': '$payDate'},
+                    'month': {'$month': '$payDate'}
                 },
                 'total_revenue': {'$sum': '$amount'},
                 'transaction_count': {'$sum': 1}
             }},
             {'$sort': {'_id.month': 1}}
-        ]
-        
-        monthly_results = list(db.transactions.aggregate(pipeline))
-        
-        # Convert to frontend format
+        ])
+
+        monthly_results = list(db.payments.aggregate(pipeline))
+
+        # Convert to frontend format, convert paise to rupees
         revenue_data = []
         month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        
+
         for result in monthly_results:
             month_num = result['_id']['month']
+            total_paise = result.get('total_revenue', 0) or 0
+            try:
+                revenue_rupees = float(total_paise) / 100.0
+            except Exception:
+                revenue_rupees = float(total_paise)
+
             revenue_data.append({
                 'month': month_names[month_num - 1],
-                'revenue': result['total_revenue']
+                'revenue': round(revenue_rupees, 2)
             })
-        
+
         return jsonify({'monthly_revenue': revenue_data}), 200
     except Exception as e:
         return jsonify({'message': f'Error fetching monthly revenue: {str(e)}'}), 500
@@ -554,21 +669,30 @@ def get_weekly_revenue():
         # Calculate the start of the current year
         current_year = datetime.now().year
         year_start = datetime(current_year, 1, 1)
-        
-        # Aggregate transactions by week for the current year
+
+        # Aggregate payments by week for the current year
         pipeline = [
+            {'$addFields': {
+                'payDate': {
+                    '$cond': [
+                        {'$eq': [{'$type': '$created_at'}, 'date']},
+                        '$created_at',
+                        {'$toDate': '$created_at'}
+                    ]
+                }
+            }},
             {'$match': {
                 **filter_query,
-                'payment_status': 'Completed',  # Only count completed transactions
-                'transaction_date': {
+                'payment_status': 'Completed',
+                'payDate': {
                     '$gte': year_start,
                     '$lt': datetime(current_year + 1, 1, 1)
                 }
             }},
             {'$group': {
                 '_id': {
-                    'year': {'$year': '$transaction_date'},
-                    'week': {'$week': '$transaction_date'}
+                    'year': {'$year': '$payDate'},
+                    'week': {'$week': '$payDate'}
                 },
                 'total_revenue': {'$sum': '$amount'},
                 'transaction_count': {'$sum': 1}
@@ -576,18 +700,24 @@ def get_weekly_revenue():
             {'$sort': {'_id.week': 1}},
             {'$limit': 12}  # Get last 12 weeks
         ]
-        
-        weekly_results = list(db.transactions.aggregate(pipeline))
-        
-        # Convert to frontend format
+
+        weekly_results = list(db.payments.aggregate(pipeline))
+
+        # Convert to frontend format (convert paise to rupees)
         revenue_data = []
         for result in weekly_results:
             week_num = result['_id']['week']
+            total_paise = result.get('total_revenue', 0) or 0
+            try:
+                revenue_rupees = float(total_paise) / 100.0
+            except Exception:
+                revenue_rupees = float(total_paise)
+
             revenue_data.append({
                 'week': f'Week {week_num}',
-                'revenue': result['total_revenue']
+                'revenue': round(revenue_rupees, 2)
             })
-        
+
         return jsonify({'weekly_revenue': revenue_data}), 200
     except Exception as e:
         return jsonify({'message': f'Error fetching weekly revenue: {str(e)}'}), 500
@@ -614,22 +744,27 @@ def get_payments_summary():
                 current_month = datetime.now().strftime('%Y-%m')
                 filter_query['transaction_date'] = {'$regex': current_month}
         
-        # Get filtered transactions
-        filtered_transactions = list(db.transactions.find(filter_query))
-        
-        # Calculate summary statistics
-        total_revenue = sum(t['amount'] for t in filtered_transactions if t['payment_status'] == 'Completed')
-        total_transactions = len(filtered_transactions)
-        successful_transactions = len([t for t in filtered_transactions if t['payment_status'] == 'Completed'])
+        # Get filtered payments
+        filtered_payments = list(db.payments.find(filter_query))
+
+        # Calculate summary statistics (convert paise to rupees)
+        total_paise = sum(p.get('amount', 0) for p in filtered_payments if p.get('payment_status') == 'Completed')
+        try:
+            total_revenue = float(total_paise) / 100.0
+        except Exception:
+            total_revenue = float(total_paise or 0)
+
+        total_transactions = len(filtered_payments)
+        successful_transactions = len([p for p in filtered_payments if p.get('payment_status') == 'Completed'])
         success_rate = (successful_transactions / total_transactions * 100) if total_transactions > 0 else 0
-        
+
         summary = {
             'total_revenue': round(total_revenue, 2),
             'total_transactions': total_transactions,
             'successful_transactions': successful_transactions,
             'success_rate': round(success_rate, 1)
         }
-        
+
         return jsonify(summary), 200
     except Exception as e:
         return jsonify({'message': f'Error fetching payments summary: {str(e)}'}), 500

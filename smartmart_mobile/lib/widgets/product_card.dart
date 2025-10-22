@@ -8,10 +8,7 @@ import '../utils/constants.dart';
 class ProductCard extends StatelessWidget {
   final Product product;
 
-  const ProductCard({
-    super.key,
-    required this.product,
-  });
+  const ProductCard({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -32,9 +29,7 @@ class ProductCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: Colors.grey[300],
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
+                      child: const Center(child: CircularProgressIndicator()),
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.grey[300],
@@ -88,7 +83,7 @@ class ProductCard extends StatelessWidget {
                   children: [
                     if (product.isDiscounted)
                       Text(
-                        '\$${product.originalPrice.toStringAsFixed(2)}',
+                        '₹${product.originalPrice.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 14,
                           decoration: TextDecoration.lineThrough,
@@ -97,7 +92,7 @@ class ProductCard extends StatelessWidget {
                       ),
                     if (product.isDiscounted) const SizedBox(width: 8),
                     Text(
-                      '\$${product.currentPrice.toStringAsFixed(2)}',
+                      '₹${product.currentPrice.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

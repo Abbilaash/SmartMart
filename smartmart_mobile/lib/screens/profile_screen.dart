@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../services/session_service.dart';
+import '../services/payments_api_service.dart';
+import 'auth/login_screen.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,15 +13,56 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'user@example.com');
-  final _phoneController = TextEditingController(text: '+1 234 567 8900');
+  String _name = 'User';
+  String _phoneDisplay = '';
+  String _role = '';
+  double _totalSpent = 0.0;
+  List<Map<String, dynamic>> _payments = [];
+  bool _loading = true;
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _phoneController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final name = await SessionService.getName();
+    final phone = await SessionService.getPhoneNumber();
+    final role = await SessionService.getRole();
+    if (!mounted) return;
+    setState(() {
+      _name = (name == null || name.isEmpty) ? 'User' : name;
+      _phoneDisplay = phone ?? '';
+      _role = role ?? '';
+    });
+    if (phone != null) {
+      try {
+        final payments = await PaymentsApiService.getPayments(phone);
+        double total = 0.0;
+        for (final p in payments) {
+          final amt = (p['amount'] ?? 0);
+          total += (amt is int) ? amt.toDouble() : (amt is double ? amt : 0.0);
+        }
+        setState(() {
+          _payments = payments.reversed.toList(); // oldest to newest for graph
+          _totalSpent = total / 100.0; // backend returns paise
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _payments = [];
+          _totalSpent = 0.0;
+          _loading = false;
+        });
+      }
+    } else {
+      setState(() {
+        _payments = [];
+        _totalSpent = 0.0;
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -25,114 +70,187 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
+        backgroundColor: AppColors.primaryPurple,
+        foregroundColor: Colors.white,
+        elevation: 2,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Profile Picture
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: AppColors.primaryPurple,
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: AppColors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // User Name
-            const Text(
-              'John Doe',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            // Phone Number
-            Text(
-              _phoneController.text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Form
-            Form(
-              key: _formKey,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      return null;
-                    },
+                  const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: AppColors.primaryPurple,
+                    child: Icon(Icons.person, size: 50, color: AppColors.white),
                   ),
                   const SizedBox(height: 16),
-                  
-                  TextFormField(
-                    decoration: const InputDecoration(
-                      labelText: 'New Password',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock),
+                  Text(
+                    _name,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
-                    obscureText: true,
                   ),
-                  const SizedBox(height: 16),
-                  
-                  TextFormField(
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock),
+                  const SizedBox(height: 8),
+                  Text(
+                    _phoneDisplay,
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_role.isNotEmpty)
+                    Text(
+                      'Role: $_role',
+                      style: const TextStyle(fontSize: 15, color: Colors.grey),
                     ),
-                    obscureText: true,
+                  const SizedBox(height: 16),
+                  Card(
+                    color: AppColors.primaryPurple.withOpacity(0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Total Spent',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '₹${_totalSpent.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryPurple,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Icon(
+                            Icons.trending_up,
+                            color: AppColors.primaryPurple,
+                            size: 32,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Update Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profile updated successfully!'),
-                              backgroundColor: AppColors.primaryPurple,
+                  if (_payments.isNotEmpty)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Spending Trend (Last 7 Purchases)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 180,
+                          child: LineChart(
+                            LineChartData(
+                              gridData: FlGridData(
+                                show: true,
+                                drawVerticalLine: false,
+                              ),
+                              borderData: FlBorderData(show: false),
+                              titlesData: FlTitlesData(
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 40,
+                                  ),
+                                ),
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                rightTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                topTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                              ),
+                              minY: 0,
+                              lineBarsData: [
+                                LineChartBarData(
+                                  spots: [
+                                    for (int i = 0; i < _payments.length; i++)
+                                      FlSpot(
+                                        i.toDouble(),
+                                        ((_payments[i]['amount'] ?? 0) is int
+                                                ? (_payments[i]['amount'] ?? 0)
+                                                      .toDouble()
+                                                : (_payments[i]['amount'] ??
+                                                      0.0)) /
+                                            100.0,
+                                      ),
+                                  ],
+                                  isCurved: true,
+                                  color: AppColors.primaryPurple,
+                                  barWidth: 3,
+                                  dotData: FlDotData(show: true),
+                                ),
+                              ],
                             ),
-                          );
-                        }
-                      },
-                      child: const Text('Update Profile'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _payments.first['created_at']?.toString() ?? '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            Text(
+                              _payments.last['created_at']?.toString() ?? '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Logout Button
+                  if (_payments.isEmpty)
+                    const Text(
+                      'No recent payments to show graph.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: () {
-                        // TODO: Implement logout
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Logout coming soon!'),
-                            backgroundColor: AppColors.primaryPurple,
+                      onPressed: () async {
+                        await SessionService.clear();
+                        if (!mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
                           ),
+                          (_) => false,
                         );
                       },
                       style: OutlinedButton.styleFrom(
@@ -145,9 +263,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

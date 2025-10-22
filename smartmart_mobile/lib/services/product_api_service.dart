@@ -7,10 +7,8 @@ class ProductApiService {
   // Fetch product details by barcode/product_id
   static Future<Product?> getProductByBarcode(String barcode) async {
     try {
-      // For now, we'll use the barcode as product_id since the backend expects product_id
-      // In a real implementation, you might have a separate endpoint to search by barcode
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getProduct}/${barcode}'),
+        Uri.parse('${ApiConfig.baseUrl}/products/$barcode'),
         headers: {'Content-Type': 'application/json'},
       );
 

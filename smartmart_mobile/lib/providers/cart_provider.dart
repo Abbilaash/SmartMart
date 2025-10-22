@@ -70,24 +70,40 @@ class CartProvider with ChangeNotifier {
 
       // Convert products to cart items using backend data
       for (final product in products) {
+        // Ensure required fields are not null
+        final productId = product['product_id'];
+        final productName = product['name'];
+        final originalPrice = product['price'];
+        final discountPrice = product['discount_price'];
+        final quantity = product['quantity'];
+
+        if (productId == null || productName == null || originalPrice == null) {
+          continue; // Skip invalid products
+        }
+
         // Create a product object with discount information
         final productModel = Product(
-          id: product['product_id'],
-          name: product['name'],
+          id: productId.toString(),
+          name: productName.toString(),
           image: 'assets/icons/barcode_scanner.svg', // Default image
-          originalPrice: product['price'].toDouble(),
-          discountPrice: product['discount_price'] != product['price']
-              ? product['discount_price'].toDouble()
+          originalPrice: (originalPrice is num)
+              ? originalPrice.toDouble()
+              : 0.0,
+          discountPrice:
+              (discountPrice != null &&
+                  discountPrice != originalPrice &&
+                  discountPrice is num)
+              ? discountPrice.toDouble()
               : null,
           stock: 0, // Not needed for cart display
           category: 'General',
           description: null,
         );
 
-        // Use quantity from backend
-        final quantity = product['quantity'] ?? 1;
+        // Use quantity from backend, default to 1 if null
+        final itemQuantity = (quantity is num) ? quantity.toInt() : 1;
 
-        _items.add(CartItem(product: productModel, quantity: quantity));
+        _items.add(CartItem(product: productModel, quantity: itemQuantity));
       }
 
       _error = null;

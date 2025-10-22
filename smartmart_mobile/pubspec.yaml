@@ -1,8 +1,8 @@
-name: smartmart_mobile
-description: "A new Flutter project."
+name: SmartMart
+description: "Be Smart, Shop Smart"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
+  url_launcher: ^6.1.10
   provider: ^6.0.5
   shared_preferences: ^2.2.0
   http: ^1.1.0
@@ -39,24 +40,44 @@ dependencies:
   intl: ^0.18.1
   flutter_svg: ^2.0.7
   cached_network_image: ^3.3.0
+  fl_chart: ^1.1.1
+  webview_flutter: ^4.7.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "web/favicon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "web/favicon.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "web/favicon.png"
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: center
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
   assets:
     - assets/icons/barcode_scanner.svg
+  # url_launcher is used to open Stripe checkout page externally
+  # run `flutter pub get` after this change
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -38,10 +38,7 @@ class _CartScreenState extends State<CartScreen> {
         backgroundColor: AppColors.primaryPurple,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadCartData,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadCartData),
         ],
       ),
       body: _buildBody(context, cartProvider),
@@ -50,9 +47,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildBody(BuildContext context, CartProvider cartProvider) {
     if (cartProvider.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (cartProvider.error != null) {
@@ -64,16 +59,16 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(height: 16),
             Text(
               'Error loading cart',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.red[600],
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(color: Colors.red[600]),
             ),
             const SizedBox(height: 8),
             Text(
               cartProvider.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.red[500],
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.red[500]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -168,7 +163,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    '\$${cartProvider.totalAmount.toStringAsFixed(2)}',
+                    '₹${cartProvider.totalAmount.toStringAsFixed(2)}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.primaryPurple,

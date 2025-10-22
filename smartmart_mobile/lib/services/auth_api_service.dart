@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_config.dart';
+import 'session_service.dart';
 
 class AuthApiService {
   static Future<Map<String, dynamic>> signup({
@@ -34,7 +35,16 @@ class AuthApiService {
       body: jsonEncode({'phone_number': phoneNumber, 'password': password}),
     );
     final body = jsonDecode(res.body);
-    if (res.statusCode >= 200 && res.statusCode < 300) return body;
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final user = body['user'] as Map<String, dynamic>?;
+      await SessionService.saveLogin(
+        phoneNumber: phoneNumber,
+        password: password,
+        name: user?['name']?.toString(),
+        role: user?['role']?.toString(),
+      );
+      return body;
+    }
     throw Exception(body['message'] ?? 'Login failed');
   }
 }
