@@ -422,26 +422,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Development Team
 
-**Lead Developer**: [Your Name]
-- **Email**: your.email@example.com
-- **LinkedIn**: [Your LinkedIn Profile]
-- **GitHub**: [Your GitHub Profile]
-
-### Project Contributors
-
-- **Backend Development**: Flask API and MongoDB integration
-- **Frontend Development**: React admin dashboard
-- **Mobile Development**: Flutter application
-- **UI/UX Design**: User interface and experience design
-- **DevOps**: Deployment and infrastructure management
-
-### Acknowledgments
-
-- **Stripe**: Payment processing services
-- **MongoDB**: Database solutions
-- **Flutter Team**: Mobile development framework
-- **React Team**: Web development framework
-- **Open Source Community**: Various libraries and tools
+**A T Abbilaash**: 23n201@psgtech.ac.in
+**Nivashini N**: 23n234@psgtech.ac.in
+**Swadhitha S P**: 23n258@psgtech.ac.in
+**Niranjana Nayagi B**: 23n233@psgtech.ac.in
 
 ---
 
