@@ -80,27 +80,6 @@ SmartMart/
     └── SMARTMART_TEST_SUITES.md # Comprehensive test documentation
 ```
 
-### System Architecture Flow
-
-```mermaid
-graph TB
-    A[Mobile App] --> B[Flask Backend API]
-    C[Admin Dashboard] --> B
-    B --> D[MongoDB Database]
-    B --> E[Stripe Payment Gateway]
-    
-    A --> F[Barcode Scanner]
-    A --> G[Cart Management]
-    A --> H[Payment Processing]
-    
-    C --> I[Product Management]
-    C --> J[Order Management]
-    C --> K[Analytics Dashboard]
-    C --> L[Discount Management]
-```
-
----
-
 ## ✨ Features
 
 ### 📱 Mobile Application Features
