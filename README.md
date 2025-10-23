@@ -423,8 +423,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Development Team
 
 **A T Abbilaash**: 23n201@psgtech.ac.in
+
 **Nivashini N**: 23n234@psgtech.ac.in
+
 **Swadhitha S P**: 23n258@psgtech.ac.in
+
 **Niranjana Nayagi B**: 23n233@psgtech.ac.in
 
 ---
