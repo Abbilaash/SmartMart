@@ -434,5 +434,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
   <p>Made with ❤️ by the SmartMart Development Team</p>
-  <p>© 2024 SmartMart. All rights reserved.</p>
+  <p>© 2025 SmartMart. All rights reserved.</p>
 </div>
