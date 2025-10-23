@@ -4,7 +4,6 @@ import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/cart_item_widget.dart';
 import 'billing_screen.dart';
-import '../utils/api_config.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -25,7 +24,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _loadCartData() async {
     final cartProvider = context.read<CartProvider>();
-    await cartProvider.fetchCartProducts(ApiConfig.defaultPhoneNumber);
+    await cartProvider.fetchCartProducts();
   }
 
   @override

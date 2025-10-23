@@ -16,6 +16,27 @@ const Payments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Utility function to format prices consistently
+  const formatPrice = (amount) => {
+    if (amount === null || amount === undefined) return '₹0';
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return '₹0';
+    // Divide by 100 to convert from paise to rupees
+    const amountInRupees = numAmount / 100;
+    return `₹${amountInRupees.toLocaleString('en-IN', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`;
+  };
+
+  // Custom formatter for chart tooltips
+  const formatChartTooltip = (value, name) => {
+    if (name === 'revenue') {
+      return [formatPrice(value), 'Revenue'];
+    }
+    return [value, name];
+  };
+
   useEffect(() => {
     fetchPaymentsData();
   }, [filterStatus, filterDate]);
@@ -139,7 +160,7 @@ const Payments = () => {
           </div>
           <div>
             <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
-            <p className="text-white text-2xl font-bold">₹{summary.total_revenue.toFixed(2)}</p>
+            <p className="text-white text-2xl font-bold">{formatPrice(summary.total_revenue)}</p>
           </div>
         </div>
         
@@ -188,6 +209,7 @@ const Payments = () => {
                   <XAxis dataKey="month" stroke="#9CA3AF" />
                   <YAxis stroke="#9CA3AF" />
                   <Tooltip 
+                    formatter={formatChartTooltip}
                     contentStyle={{ 
                       backgroundColor: '#1F2937', 
                       border: 'none', 
@@ -224,6 +246,7 @@ const Payments = () => {
                   <XAxis dataKey="week" stroke="#9CA3AF" />
                   <YAxis stroke="#9CA3AF" />
                   <Tooltip 
+                    formatter={formatChartTooltip}
                     contentStyle={{ 
                       backgroundColor: '#1F2937', 
                       border: 'none', 
@@ -286,7 +309,7 @@ const Payments = () => {
                     <td className="py-4 px-6 text-white font-medium">{transaction.transaction_id}</td>
                     <td className="py-4 px-6 text-violet-400">{transaction.order_id}</td>
                     <td className="py-4 px-6 text-white">{transaction.customer_name}</td>
-                    <td className="py-4 px-6 text-emerald-400 font-bold">₹{transaction.amount}</td>
+                    <td className="py-4 px-6 text-emerald-400 font-bold">{formatPrice(transaction.amount)}</td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2 text-white">
                         {getModeIcon(transaction.payment_mode)}

@@ -4,7 +4,7 @@ import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
 import '../services/order_api_service.dart';
 import '../services/payment_service.dart';
-import '../utils/api_config.dart';
+import '../services/session_service.dart';
 import 'payment_webview_screen.dart';
 
 class BillingScreen extends StatefulWidget {
@@ -363,10 +363,22 @@ class _BillingScreenState extends State<BillingScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      // Get current user's phone number
+      final phoneNumber = await SessionService.getPhoneNumber();
+      if (phoneNumber == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('User not logged in'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       // Create payment session
       final paymentResult = await PaymentService.processUpiPayment(
         amount: cartProvider.totalAmount,
-        userId: ApiConfig.defaultPhoneNumber,
+        userId: phoneNumber,
         orderId: 'order_${DateTime.now().millisecondsSinceEpoch}',
         billingAddress: billingAddress,
       );
@@ -450,9 +462,21 @@ class _BillingScreenState extends State<BillingScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      // Get current user's phone number
+      final phoneNumber = await SessionService.getPhoneNumber();
+      if (phoneNumber == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('User not logged in'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       final result = await PaymentService.processCardPayment(
         amount: cartProvider.totalAmount,
-        userId: ApiConfig.defaultPhoneNumber,
+        userId: phoneNumber,
         orderId: 'order_${DateTime.now().millisecondsSinceEpoch}',
         billingAddress: billingAddress,
       );
@@ -520,9 +544,21 @@ class _BillingScreenState extends State<BillingScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      // Get current user's phone number
+      final phoneNumber = await SessionService.getPhoneNumber();
+      if (phoneNumber == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('User not logged in'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       // Place order after successful payment
       final orderResponse = await OrderApiService.placeOrder(
-        phoneNumber: ApiConfig.defaultPhoneNumber,
+        phoneNumber: phoneNumber,
         paymentMethod: paymentMode.toLowerCase(),
         billingAddress: billingAddress,
       );

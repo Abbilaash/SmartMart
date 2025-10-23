@@ -61,14 +61,68 @@ def add_product():
 
 @admin_bp.route('/admin/product/delete_product', methods=['DELETE'])
 def delete_product():
+    """Delete a product by product_id (preferred), barcode, or Mongo _id.
+
+    Accepts identifiers via query params or JSON body:
+      - product_id=<barcode-as-id>
+      - barcode=<barcode>
+      - _id=<mongo object id>
+    """
+    # accept identifiers from query string first (works well with DELETE)
+    args = request.args or {}
     data = request.get_json(silent=True) or {}
-    product_id = data.get('product_id') or data.get('barcode')
-    if not product_id:
-        return jsonify({'message': 'Missing product_id'}), 400
+
+    product_id = args.get('product_id') or data.get('product_id')
+    barcode = args.get('barcode') or data.get('barcode')
+    mongo_id = args.get('_id') or data.get('_id')
+
+    if not (product_id or barcode or mongo_id):
+        return jsonify({'message': 'Missing identifier: provide product_id, barcode, or _id'}), 400
+
     db = get_db()
-    result = db.products.delete_one({'product_id': product_id})
-    if result.deleted_count == 0:
+
+    # Build deletion filters by precedence: _id > product_id > barcode
+    delete_filters = []
+
+    if mongo_id:
+        try:
+            delete_filters.append({'_id': ObjectId(mongo_id)})
+        except Exception:
+            return jsonify({'message': 'Invalid _id'}), 400
+
+    if product_id:
+        # Check if product_id looks like a MongoDB ObjectId (24 hex chars)
+        if len(product_id) == 24 and all(c in '0123456789abcdefABCDEF' for c in product_id):
+            try:
+                delete_filters.append({'_id': ObjectId(product_id)})
+            except Exception:
+                pass
+        else:
+            # Regular product_id (barcode)
+            delete_filters.append({'product_id': product_id})
+
+    if barcode:
+        # In this schema product_id equals barcode; still try both fields just in case
+        delete_filters.append({'barcode': barcode})
+        if not product_id:
+            delete_filters.append({'product_id': barcode})
+
+    deleted = 0
+    last_error = None
+    for f in delete_filters:
+        try:
+            res = db.products.delete_one(f)
+            if res.deleted_count:
+                deleted += res.deleted_count
+                break
+        except Exception as e:
+            last_error = str(e)
+
+    if deleted == 0:
+        if last_error:
+            return jsonify({'message': f'Error deleting product: {last_error}'}), 500
         return jsonify({'message': 'Product not found'}), 404
+
     return jsonify({'message': 'Product deleted successfully'}), 200
 
 @admin_bp.route('/admin/product/update_product', methods=['PUT'])
@@ -94,6 +148,33 @@ def get_products():
 @admin_bp.route('/admin/order/get_orders', methods=['GET'])
 def get_orders():
     db = get_db()
+    
+    # Get query parameters for filtering
+    payment_status_filter = request.args.get('payment_status', 'All')
+    amount_filter = request.args.get('amount_filter', 'All')  # 'All', 'above', 'below'
+    amount_value = request.args.get('amount_value')
+    
+    # Build match conditions for filtering
+    match_conditions = {}
+    
+    # Payment status filter
+    if payment_status_filter != 'All':
+        if payment_status_filter == 'Completed':
+            match_conditions['payment_status'] = 'Completed'
+        elif payment_status_filter == 'Unpaid':
+            match_conditions['payment_status'] = {'$ne': 'Completed'}
+    
+    # Amount comparison filter (above/below specific value)
+    if amount_value and amount_filter != 'All':
+        try:
+            amount_val = float(amount_value)
+            if amount_filter == 'above':
+                match_conditions['total_amount'] = {'$gt': amount_val}
+            elif amount_filter == 'below':
+                match_conditions['total_amount'] = {'$lt': amount_val}
+        except ValueError:
+            pass
+    
     pipeline = [
         {
             '$lookup': {
@@ -108,30 +189,80 @@ def get_orders():
                 'path': '$user_info',
                 'preserveNullAndEmptyArrays': True
             }
-        },
-        {
-            '$project': {
-                '_id': 1,  # Keep _id for ObjectId
-                'customer': '$user_info.name',
-                'payment_status': {
-                    '$cond': [
-                        {'$eq': ['$payment_status', 'Completed']},
-                        'Completed',
-                        {'$cond': [{'$eq': ['$payment_status', 'failed']}, 'Failed', 'Unpaid']}
-                    ]
-                },
-                'delivery_status': 1,
-                'date': {'$ifNull': ['$date', '']},
-                'total': '$total_amount'
-            }
         }
     ]
+    
+    # Add match stage if filters are applied
+    if match_conditions:
+        pipeline.append({'$match': match_conditions})
+    
+    pipeline.append({
+        '$project': {
+            '_id': 1,  # Keep _id for ObjectId
+            'customer': '$user_info.name',
+            'payment_status': {
+                '$cond': [
+                    {'$eq': ['$payment_status', 'Completed']},
+                    'Completed',
+                    {'$cond': [{'$eq': ['$payment_status', 'failed']}, 'Failed', 'Unpaid']}
+                ]
+            },
+            'delivery_status': 1,
+            'date': {
+                '$cond': [
+                    {'$ne': ['$order_date', None]},
+                    {'$dateToString': {'format': '%Y-%m-%d %H:%M:%S', 'date': '$order_date'}},
+                    {'$ifNull': ['$created_at', '']}
+                ]
+            },
+            'total': '$total_amount'
+        }
+    })
+    
+    # Add sorting by date (newest first)
+    pipeline.append({'$sort': {'order_date': -1}})
+    
     orders = list(db.orders.aggregate(pipeline))
     # Convert _id to string and assign to order_id
     for order in orders:
         order['order_id'] = str(order['_id'])
         del order['_id']
+    
     return jsonify({'orders': orders}), 200
+
+@admin_bp.route('/admin/order/get_order_details', methods=['POST'])
+def get_order_details():
+    """Get detailed order information including products"""
+    data = request.get_json()
+    if not data or 'order_id' not in data:
+        return jsonify({'message': 'Missing order_id'}), 400
+    
+    db = get_db()
+    
+    try:
+        # Convert string order_id to ObjectId
+        order_id = ObjectId(data['order_id'])
+        
+        # Find the order
+        order = db.orders.find_one({'_id': order_id})
+        if not order:
+            return jsonify({'message': 'Order not found'}), 404
+        
+        # Convert ObjectId to string for JSON serialization
+        order['_id'] = str(order['_id'])
+        
+        # Format dates for frontend
+        if 'order_date' in order and isinstance(order['order_date'], datetime):
+            order['order_date'] = order['order_date'].strftime('%Y-%m-%d %H:%M:%S')
+        if 'created_at' in order and isinstance(order['created_at'], datetime):
+            order['created_at'] = order['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        if 'updated_at' in order and isinstance(order['updated_at'], datetime):
+            order['updated_at'] = order['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        return jsonify({'order': order}), 200
+        
+    except Exception as e:
+        return jsonify({'message': f'Error fetching order details: {str(e)}'}), 500
 
 @admin_bp.route('/admin/order/mark_delivered', methods=['PUT'])
 def mark_order_delivered():
@@ -472,11 +603,11 @@ def get_transactions():
                     customer_name = user.get('name')
             t['customer_name'] = customer_name or p.get('customer_name') or ''
 
-            # Amount: stored as paise -> convert to rupees float
+            # Amount: already in rupees
             amt = p.get('amount', 0)
             try:
-                # If amount is stored in smallest currency unit (paise), divide by 100
-                t['amount'] = round(float(amt) / 100.0, 2)
+                # Amount is already in rupees, just format it
+                t['amount'] = round(float(amt), 2)
             except Exception:
                 t['amount'] = amt
 
@@ -629,11 +760,11 @@ def get_monthly_revenue():
 
         for result in monthly_results:
             month_num = result['_id']['month']
-            total_paise = result.get('total_revenue', 0) or 0
+            total_revenue = result.get('total_revenue', 0) or 0
             try:
-                revenue_rupees = float(total_paise) / 100.0
+                revenue_rupees = float(total_revenue)
             except Exception:
-                revenue_rupees = float(total_paise)
+                revenue_rupees = float(total_revenue)
 
             revenue_data.append({
                 'month': month_names[month_num - 1],
@@ -707,11 +838,11 @@ def get_weekly_revenue():
         revenue_data = []
         for result in weekly_results:
             week_num = result['_id']['week']
-            total_paise = result.get('total_revenue', 0) or 0
+            total_revenue = result.get('total_revenue', 0) or 0
             try:
-                revenue_rupees = float(total_paise) / 100.0
+                revenue_rupees = float(total_revenue)
             except Exception:
-                revenue_rupees = float(total_paise)
+                revenue_rupees = float(total_revenue)
 
             revenue_data.append({
                 'week': f'Week {week_num}',
@@ -747,12 +878,12 @@ def get_payments_summary():
         # Get filtered payments
         filtered_payments = list(db.payments.find(filter_query))
 
-        # Calculate summary statistics (convert paise to rupees)
-        total_paise = sum(p.get('amount', 0) for p in filtered_payments if p.get('payment_status') == 'Completed')
+        # Calculate summary statistics (amounts are already in rupees)
+        total_revenue = sum(p.get('amount', 0) for p in filtered_payments if p.get('payment_status') == 'Completed')
         try:
-            total_revenue = float(total_paise) / 100.0
+            total_revenue = float(total_revenue)
         except Exception:
-            total_revenue = float(total_paise or 0)
+            total_revenue = 0.0
 
         total_transactions = len(filtered_payments)
         successful_transactions = len([p for p in filtered_payments if p.get('payment_status') == 'Completed'])

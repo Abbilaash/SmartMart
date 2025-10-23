@@ -90,20 +90,6 @@ const Dashboard = () => {
     }
   };
 
-  const recentActivity = [
-    { id: 1, action: '', user: '', time: '', type: '' }
-  ];
-
-  const getActivityColor = (type) => {
-    switch (type) {
-      case 'order': return 'text-emerald-400';
-      case 'product': return 'text-violet-400';
-      case 'payment': return 'text-blue-400';
-      case 'user': return 'text-amber-400';
-      case 'alert': return 'text-red-400';
-      default: return 'text-gray-400';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -174,25 +160,6 @@ const Dashboard = () => {
               <div className="text-gray-400">No sales data available</div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-slate-800 rounded-2xl p-6 shadow-md">
-        <h3 className="text-xl font-bold text-white mb-6">Recent Activity</h3>
-        <div className="space-y-4">
-          {recentActivity.map((activity) => (
-            <div key={activity.id} className="flex items-center justify-between p-4 bg-slate-700 rounded-xl hover:bg-slate-600 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className={`w-2 h-2 rounded-full ${getActivityColor(activity.type).replace('text-', 'bg-')}`}></div>
-                <div>
-                  <p className="text-white font-medium">{activity.action}</p>
-                  <p className="text-gray-400 text-sm">by {activity.user}</p>
-                </div>
-              </div>
-              <span className="text-gray-400 text-sm">{activity.time}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

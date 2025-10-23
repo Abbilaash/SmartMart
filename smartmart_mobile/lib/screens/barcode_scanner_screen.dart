@@ -5,7 +5,6 @@ import '../utils/constants.dart';
 import '../providers/cart_provider.dart';
 import '../services/product_api_service.dart';
 import '../models/product.dart';
-import '../utils/api_config.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
@@ -328,10 +327,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     if (_lastScannedValue != null) {
       try {
         final cartProvider = context.read<CartProvider>();
-        final success = await cartProvider.addProductToCart(
-          ApiConfig.defaultPhoneNumber,
-          _lastScannedValue!,
-        );
+        final success = await cartProvider.addProductToCart(_lastScannedValue!);
 
         if (success) {
           if (mounted) {

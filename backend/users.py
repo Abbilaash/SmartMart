@@ -695,6 +695,41 @@ def users_login():
     }), 200
 
 
+@users_bp.route('/users/change_password', methods=['POST'])
+def change_password():
+    data = request.get_json() or {}
+    required_fields = ['phone_number', 'old_password', 'new_password']
+    if not all(field in data and data[field] for field in required_fields):
+        return jsonify({'message': 'Missing required fields'}), 400
+
+    db = get_db()
+    
+    # Find user by phone number
+    user = db.users.find_one({'phone_number': data['phone_number']})
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    # Verify old password
+    stored_pwd = user.get('password', '')
+    old_password_valid = stored_pwd == data['old_password'] or check_password_hash(stored_pwd, data['old_password'])
+    if not old_password_valid:
+        return jsonify({'message': 'Current password is incorrect'}), 400
+
+    # Hash new password
+    new_hashed_password = generate_password_hash(data['new_password'])
+
+    # Update password in database
+    result = db.users.update_one(
+        {'phone_number': data['phone_number']},
+        {'$set': {'password': new_hashed_password}}
+    )
+
+    if result.modified_count == 0:
+        return jsonify({'message': 'Failed to update password'}), 500
+
+    return jsonify({'message': 'Password changed successfully'}), 200
+
+
 @users_bp.route('/users/create-payment-session', methods=['POST'])
 def create_payment_session():
     try:

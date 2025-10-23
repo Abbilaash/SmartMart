@@ -3,6 +3,7 @@ import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../models/order.dart';
 import '../services/cart_api_service.dart';
+import '../services/session_service.dart';
 
 class CartProvider with ChangeNotifier {
   final List<CartItem> _items = [];
@@ -19,6 +20,11 @@ class CartProvider with ChangeNotifier {
 
   double get totalAmount {
     return _items.fold(0.0, (sum, item) => sum + item.totalPrice);
+  }
+
+  // Get current user's phone number
+  Future<String?> _getCurrentUserPhone() async {
+    return await SessionService.getPhoneNumber();
   }
 
   void addItem(Product product) {
@@ -58,8 +64,20 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Fetch cart products from API
-  Future<void> fetchCartProducts(String phoneNumber) async {
+  // Fetch cart products from API using current user's phone number
+  Future<void> fetchCartProducts() async {
+    final phoneNumber = await _getCurrentUserPhone();
+    if (phoneNumber == null) {
+      _error = 'User not logged in';
+      notifyListeners();
+      return;
+    }
+
+    await fetchCartProductsWithPhone(phoneNumber);
+  }
+
+  // Fetch cart products from API with specific phone number
+  Future<void> fetchCartProductsWithPhone(String phoneNumber) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -115,8 +133,15 @@ class CartProvider with ChangeNotifier {
     }
   }
 
-  // Add product to cart via API
-  Future<bool> addProductToCart(String phoneNumber, String productId) async {
+  // Add product to cart via API using current user's phone number
+  Future<bool> addProductToCart(String productId) async {
+    final phoneNumber = await _getCurrentUserPhone();
+    if (phoneNumber == null) {
+      _error = 'User not logged in';
+      notifyListeners();
+      return false;
+    }
+
     try {
       final success = await CartApiService.addProductToCart(
         phoneNumber,
@@ -124,7 +149,7 @@ class CartProvider with ChangeNotifier {
       );
       if (success) {
         // Refresh cart data from API
-        await fetchCartProducts(phoneNumber);
+        await fetchCartProducts();
       }
       return success;
     } catch (e) {
@@ -134,11 +159,15 @@ class CartProvider with ChangeNotifier {
     }
   }
 
-  // Remove product from cart via API
-  Future<bool> removeProductFromCart(
-    String phoneNumber,
-    String productId,
-  ) async {
+  // Remove product from cart via API using current user's phone number
+  Future<bool> removeProductFromCart(String productId) async {
+    final phoneNumber = await _getCurrentUserPhone();
+    if (phoneNumber == null) {
+      _error = 'User not logged in';
+      notifyListeners();
+      return false;
+    }
+
     try {
       final success = await CartApiService.removeProductFromCart(
         phoneNumber,
@@ -146,7 +175,7 @@ class CartProvider with ChangeNotifier {
       );
       if (success) {
         // Refresh cart data from API
-        await fetchCartProducts(phoneNumber);
+        await fetchCartProducts();
       }
       return success;
     } catch (e) {
@@ -154,6 +183,14 @@ class CartProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  // Clear all user data (for logout)
+  Future<void> clearUserData() async {
+    _items.clear();
+    _orders.clear();
+    _error = null;
+    notifyListeners();
   }
 
   void placeOrder(String paymentMethod) {

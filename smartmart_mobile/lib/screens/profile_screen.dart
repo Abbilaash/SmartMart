@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/constants.dart';
 import '../services/session_service.dart';
 import '../services/payments_api_service.dart';
+import '../providers/cart_provider.dart';
+import '../widgets/change_password_dialog.dart';
 import 'auth/login_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -240,11 +243,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(color: Colors.grey),
                     ),
                   const SizedBox(height: 32),
+                  
+                  // Change Password Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => const ChangePasswordDialog(),
+                        );
+                      },
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text('Change Password'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Logout Button
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () async {
+                        // Clear session data
                         await SessionService.clear();
+                        
+                        // Clear cart data
+                        final cartProvider = context.read<CartProvider>();
+                        await cartProvider.clearUserData();
+                        
                         if (!mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(
@@ -256,6 +291,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: const Text('Logout'),
                     ),

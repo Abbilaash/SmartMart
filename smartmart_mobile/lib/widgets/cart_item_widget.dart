@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../models/cart_item.dart';
 import '../providers/cart_provider.dart';
 import '../utils/constants.dart';
-import '../utils/api_config.dart';
 
 class CartItemWidget extends StatelessWidget {
   final CartItem item;
@@ -156,10 +155,7 @@ class CartItemWidget extends StatelessWidget {
             IconButton(
               onPressed: () async {
                 final cartProvider = context.read<CartProvider>();
-                await cartProvider.removeProductFromCart(
-                  ApiConfig.defaultPhoneNumber,
-                  item.product.id,
-                );
+                await cartProvider.removeProductFromCart(item.product.id);
               },
               icon: const Icon(Icons.delete_outline),
               color: Colors.red,
